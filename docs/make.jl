@@ -1,5 +1,6 @@
 using StableLinearAlgebra
 using Documenter
+using LinearAlgebra
 
 DocMeta.setdocmeta!(StableLinearAlgebra, :DocTestSetup, :(using StableLinearAlgebra); recursive=true)
 
@@ -15,6 +16,7 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "API" => "api.md"
     ],
 )
 

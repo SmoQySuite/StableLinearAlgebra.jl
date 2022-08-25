@@ -23,15 +23,16 @@ struct QRWorkspace{T<:Number, E<:Real}
 end
 
 # wrap geqp3 and orgqr LAPACK methods
-for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64, :Float64),
-                             (:sgeqp3_, :sorgqr_, :Float32, Float32),
-                             (:zgeqp3_, :zungqr_, :ComplexF64, Float64),
-                             (:cgeqp3_, :cungqr_, :ComplexF32, Float32))
+for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64,    :Float64),
+                                    (:sgeqp3_, :sorgqr_, :Float32,    :Float32),
+                                    (:zgeqp3_, :zungqr_, :ComplexF64, :Float64),
+                                    (:cgeqp3_, :cungqr_, :ComplexF32, :Float32))
     @eval begin
 
+        # method returns QRWorkspace for given matrix A
         function QRWorkspace(A::StridedMatrix{$elty})
 
-            # allocate for geqp3
+            # allocate for geqp3/QR decomposition calculation
             require_one_based_indexing(A)
             chkstride1(A)
             m = size(A, 1)
@@ -40,7 +41,7 @@ for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64, :Float64),
             jpvt = zeros(BlasInt, n)
             τ = zeros($elty, min(m, n))
             geqp3_work = Vector{$elty}(undef, 1)
-            geqp3_rwork = Vector{$relty}(undef, 2n)
+            geqp3_rwork = Vector{$relty}(undef, 1)
             info = Ref{BlasInt}()
             if eltype(A) <: Complex
                 ccall((@blasfunc($geqp3), liblapack), Cvoid,
@@ -56,7 +57,7 @@ for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64, :Float64),
             chklapackerror(info[])
             resize!(geqp3_work, BlasInt(real(geqp3_work[1])))
 
-            # allocate for orgqr
+            # allocate for orgqr/Q matrix construction
             k = length(τ)
             orgqr_work  = Vector{$elty}(undef, 1)
             lwork = BlasInt(-1)
@@ -70,6 +71,7 @@ for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64, :Float64),
             return QRWorkspace(geqp3_work, geqp3_rwork, orgqr_work, τ, jpvt, info)
         end
 
+        # method for calculating QR decomposition
         function geqp3!(A::AbstractMatrix{$elty}, ws::QRWorkspace{$elty})
 
             m = size(A, 1)
@@ -91,6 +93,7 @@ for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64, :Float64),
             return nothing
         end
 
+        # method for constructing Q matrix
         function orgqr!(A::AbstractMatrix{$elty}, ws::QRWorkspace{$elty})
 
             require_one_based_indexing(A, ws.τ)
