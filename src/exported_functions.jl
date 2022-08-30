@@ -1,137 +1,4 @@
 @doc raw"""
-    chain_mul!(F::LDR{T}, B::AbstractArray{T,3};
-               tmp=similar(F.L), reversed::Bool=false) where {T}
-
-Calculate a numerically stable product of a chain of matrices ``B_L B_{L-1} \dots B_l \dots B_2 B_1,`` where the ``B_l``
-matrix in the sequence is given by `B[:,:,l]`, such that the final product is represented by
-the LDR decomposition `F`. If `reversed = true`, when iterate over `B[:,:,l]` in reverse.
-Internally uses the [`lmul!`](@ref) method to perform the matrix multiplications.
-"""
-function chain_mul!(F::LDR{T}, B::AbstractArray{T,3};
-                    tmp::AbstractMatrix{T}=similar(F.L), reversed::Bool=false) where {T}
-
-    @assert size(B,1) == size(B,2) == size(F,1)
-
-    # number of B matrices
-    L  = size(B, 3)
-
-    # defining whether to iterate over B matrices in forward or reverse direction
-    if reversed
-        index_start = L
-        index_step  = -1
-        index_end   = 1
-    else
-        index_start = 1
-        index_step  = 1
-        index_end   = L
-    end
-
-    B₁ = @view B[:,:,index_start]
-    ldr!(F, B₁) # construct LDR decomposition for first matrix in chain
-    for l in (index_start+index_step):index_step:index_end
-        Bₗ = @view B[:,:,l]
-        lmul!(Bₗ, F, tmp=tmp) # stabalized multiplication by next matrix in chain
-    end
-
-    return nothing
-end
-
-
-@doc raw"""
-    chain_lmul!(B::AbstractArray{T,3}, F::LDR{T}, B̄::AbstractArray{T};
-                tmp=similar(F.L), reversed::Bool=false) where {T}
-
-Calculate a numerically stable product of a chain of matrices ``B_L \dots B_l \dots B_2 B_1``
-going from right to left, where the ``B_l`` matrix in the sequence is given by `B[:,:,l]`,
-such that the final product is represented by the LDR decomposition `F`. Additionally, let
-`B̄` contain the partial products such that `B̄[:,:,l]` corresponds to the partial product
-``B_l B_{l-1} \dots B_1.`` If `reversed = true`, when iterate over `B[:,:,l]` and `B̄[:,:,l]` in reverse.
-Internally uses the [`lmul!`](@ref) method to perform the matrix multiplications.
-"""
-function chain_lmul!(B::AbstractArray{T,3}, F::LDR{T}, B̄::AbstractArray{T,3};
-                     tmp::AbstractMatrix{T}=similar(F.L), reversed::Bool=false) where {T}
-
-    @assert size(B,1) == size(B,2) == size(F,1)
-    @assert size(B) == size(B̄)
-
-    # get number of B matrices
-    L = size(B, 3)
-
-    # defining whether to iterate over B matrices in forward
-    # or reverse direction
-    if reversed
-        index_start = L
-        index_end   = 1
-        index_step  = -1
-    else
-        index_start = 1
-        index_end   = L
-        index_step  = 1
-    end 
-
-    B₁ = @view B[:,:,index_start]
-    B̄₁ = @view B[:,:,index_start]
-    copyto!(B̄₁, B₁)
-    ldr!(F, B₁) # construct LDR decomposition for first matrix in chain
-    for l in (index_start+index_step):index_step:index_end
-        Bₗ = @view B[:,:,l]
-        B̄ₗ = @view B̄[:,:,l]
-        lmul!(Bₗ, F, tmp=tmp) # stabalized multiplication by next matrix in chain
-        copyto!(B̄ₗ, F) # record the partial product
-    end
-
-    return nothing
-end
-
-
-@doc raw"""
-    chain_rmul!(F::LDR{T}, B::AbstractArray{T,3}, B̄::AbstractArray{T,3}, tmp=similar(F.L);
-                tmp::AbstractMatrix{T}=similar(F.L), reversed::Bool=false) where {T}
-
-Calculate a numerically stable product of a chain of matrices ``B_1 B_2 \dots B_l \dots B_L``
-going from left to right, where the ``B_l`` matrix in the sequence is given by `B[:,:,l]`,
-such that the final product is represented by the LDR decomposition `F`. Additionally, let
-`B̄` contain the partial products such that `B̄[:,:,l]` corresponds to the partial product
-``B_1 B_2 \dots B_l.`` If `reversed = true`, when iterate over `B[:,:,l]` and `B̄[:,:,l]` in reverse.
-Internally uses the [`rmul!`](@ref) method to perform the matrix multiplications.
-"""
-function chain_rmul!(F::LDR{T}, B::AbstractArray{T,3}, B̄::AbstractArray{T,3};
-                     tmp::AbstractMatrix{T}=similar(F.L), reversed::Bool=false) where {T}
-
-    @assert size(B,1) == size(B,2) == size(F,1)
-    @assert size(B) == size(B̄)
-
-    # get number of B matrices
-    L = size(B, 3)
-
-    # defining whether to iterate over B matrices in forward
-    # or reverse direction
-    if reversed
-        index_start = L
-        index_end   = 1
-        index_step  = -1
-    else
-        index_start = 1
-        index_end   = L
-        index_step  = 1
-    end 
-
-    B₁ = @view B[:,:,index_start]
-    B̄₁ = @view B[:,:,index_start]
-    copyto!(B̄₁, B₁)
-    ldr!(F, B₁) # construct LDR decomposition for first matrix in chain
-    for l in (index_start+index_step):index_step:index_end
-        Bₗ = @view B[:,:,l]
-        B̄ₗ = @view B̄[:,:,l]
-        rmul!(F, Bₗ, tmp=tmp) # stabalized multiplication by next matrix in chain
-        copyto!(B̄ₗ, F) # record the partial product
-    end
-
-    return nothing
-end
-
-
-@doc raw"""
     inv!(A::AbstractMatrix, F::LDR)
 
 Calculate the inverse of a matrix ``A`` represented of the LDR decomposition `F`,
@@ -146,7 +13,7 @@ function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}) where {T}
     M   = F.M_tmp
     p   = F.p_tmp
     inv_P!(p, F.pᵀ)
-    adjoint!(A⁻¹, F.L) # A⁻¹ = Lᵀ
+    adjoint!(M, L) # A⁻¹ = Lᵀ
     ldiv_D!(d, M) # A⁻¹ = D⁻¹⋅Lᵀ
     ldiv!(R, M) # A⁻¹ = R⁻¹⋅D⁻¹⋅Lᵀ
     mul_P!(A⁻¹, p, M) # A⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
@@ -178,14 +45,13 @@ end
 
 
 @doc raw"""
-    inv_IpA!(G::AbstractMatrix, F::LDR; d_min=similar(F.d), inv_d_max=similar(F.d))
+    inv_IpA!(G::AbstractMatrix, F::LDR; F′::LDR=ldr(F), d_min=similar(F.d), d_max=similar(F.d))
 
 Given a matrix ``A`` represented by the LDR factorization `F`, calculate the numerically stabalized inverse
 ```math
 G = (I + A)^{-1},
 ```
-storing the result in the matrix `G`. Note that `F` is left modified by this method, so that it now
-corresponds to the matrix `G` instead of the original matrix `A` it previously represented.
+storing the result in the matrix `G`.
 
 # Algorithm
 
@@ -205,61 +71,45 @@ G = & \left(I+A\right)^{-1}\\
 where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
 """
 function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
+                  F′::LDR{T}=ldr(F),
                   d_min::AbstractVector{T}=similar(F.d),
-                  inv_d_max::AbstractVector{T}=similar(F.d)) where {T}
-
-    @assert length(F.pᵀ) == length(tmp)
+                  d_max::AbstractVector{T}=similar(F.d)) where {T}
 
     # construct Dmin = min(D,1) and Dmax⁻¹ = [max(D,1)]⁻¹ matrices
-    @inbounds @fastmath for i in eachindex(F.d)
-        if abs(F.d[i]) > 1
-            d_min[i]     = 1
-            inv_d_max[i] = 1/F.d[i]
-        else
-            d_min[i]     = F.d[i]
-            inv_d_max[i] = 1
-        end
-    end
+    @. d_min = min(F.d, 1)
+    @. d_max = max(F.d, 1)
 
-    # store the original [P⋅R⁻¹]₀
-    p = F.p_tmp
-    inv_P!(p, F.pᵀ) # P
-    copyto!(F.M_tmp, F.R)
-    R⁻¹ = UpperTriangular(F.M_tmp)
-    LinearAlgebra.inv!(R⁻¹)
+    # define the original P₀, R₀⁻¹
+    p₀ = F.p_tmp
+    inv_P!(p₀, F.pᵀ)
+    R₀ = UpperTriangular(F.R)
 
-    # caclulate L⋅Dmin
-    LDmin = F.L
-    rmul!(LDmin, d_min)
+    # caclulate L₀⋅Dmin
+    mul_D!(F′.L, F.L, d_min)
 
-    # calculate [P⋅R⁻¹]₀⋅Dmax⁻¹
-    PR⁻¹Dmax⁻¹ = F.R
-    mul!(PR⁻¹Dmax⁻¹, R⁻¹, inv_d_max)
-    mul_P!(PR⁻¹Dmax⁻¹, p, PR⁻¹Dmax⁻¹)
+    # calculate P₀⋅R₀⁻¹⋅Dmax⁻¹
+    copyto!(G, I)
+    ldiv_D!(d_max, G) # Dmax⁻¹
+    ldiv!(R₀, G) # R₀⁻¹⋅Dmax⁻¹
+    mul_P!(F′.M_tmp, p₀, G) # P₀⋅R₀⁻¹⋅Dmax⁻¹
 
-    # calculate LDR decomposition of L⋅D⋅R⋅Pᵀ = [P⋅R⁻¹⋅Dmax⁻¹ + L⋅Dmin]
-    @. F.L = PR⁻¹Dmax⁻¹ + LDmin
-    ldr!(F)
+    # calculate LDR decomposition of L⋅D⋅R⋅Pᵀ = [P₀⋅R₀⁻¹⋅Dmax⁻¹ + L₀⋅Dmin]
+    @. F′.L = F′.L + F′.M_tmp
+    ldr!(F′)
 
     # invert the LDR decomposition, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
-    adjoint!(G, F.L) # Lᵀ
-    ldiv_D!(F.d, G) # D⁻¹⋅Lᵀ
-    R = UpperTriangular(F.R)
-    ldiv!(R, G) # R⁻¹⋅D⁻¹⋅Lᵀ
-    inv_P!(p, F.pᵀ)
-    mul_P!(F.R, p, G) # P⋅R⁻¹⋅D⁻¹⋅Lᵀ
+    inv!(G, F′)
 
-    # F.L = Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
-    mul!(F.L, inv_d_max, F.R)
+    # Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
+    div_D!(F′.L, d_max, G)
 
-    # calculate new LDR decomposition
-    ldr!(F)
+    # calculate LDR of Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
+    ldr!(F′)
 
-    # G = [P⋅R⁻¹]₀⋅F
-    lmul!(R⁻¹, F.L)
-    mul_P!(F.M_tmp, p, F.L)
-    copyto!(F.L, F.M_tmp)
-    copyto!(G, F)
+    # G = P₀⋅R₀⁻¹⋅F
+    copyto!(F.M_tmp, F′)
+    ldiv!(R₀, F.M_tmp)
+    mul_P!(G, p₀, F.M_tmp)
 
     return nothing
 end
@@ -268,8 +118,8 @@ end
 @doc raw"""
     inv_UpV(G::AbstractMatrix, Fᵤ::LDR, Fᵥ::LDR;
             F::LDR=ldr(Fᵤ),
-            dᵤ_min::AbstractVector=similar(Fᵤ.d), inv_dᵤ_max::AbstractVector=similar(Fᵤ.d),
-            dᵥ_min::AbstractVector=similar(Fᵥ.d), inv_dᵥ_max::AbstractVector=similar(Fᵥ.d))
+            dᵤ_min::AbstractVector=similar(Fᵤ.d), dᵤ_max::AbstractVector=similar(Fᵤ.d),
+            dᵥ_min::AbstractVector=similar(Fᵥ.d), dᵥ_max::AbstractVector=similar(Fᵥ.d))
 
 Calculate the numerically stable inverse ``G = (U + V)^{-1},`` where the matrices ``U`` and
 ``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
@@ -295,65 +145,63 @@ where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
 function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                   F::LDR{T}=ldr(Fᵤ),
                   dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-                  inv_dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
+                  dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
                   dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                  inv_dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
+                  dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
 
     # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
-    @inbounds @fastmath for i in eachindex(Fᵤ.d)
-        if abs(Fᵤ.d[i]) > 1
-            dᵤ_min[i]     = 1
-            inv_dᵤ_max[i] = 1/Fᵤ.d[i]
-        else
-            dᵤ_min[i]     = Fᵤ.d[i]
-            inv_dᵤ_max[i] = 1
-        end
-    end
+    @. dᵤ_min = min(Fᵤ.d, 1)
+    @. dᵤ_max = max(Fᵤ.d, 1)
+    @. dᵥ_min = min(Fᵥ.d, 1)
+    @. dᵥ_max = max(Fᵥ.d, 1)
 
-    # calculate Dᵥ₋ = min(Dᵥ,1) and Dᵥ₊⁻¹ = [max(Dᵥ,1)]⁻¹
-    @inbounds @fastmath for i in eachindex(Fᵥ.d)
-        if abs(Fᵥ.d[i]) > 1
-            dᵥ_min[i]     = 1
-            inv_dᵥ_max[i] = 1/Fᵥ.d[i]
-        else
-            dᵥ_min[i]     = Fᵥ.d[i]
-            inv_dᵥ_max[i] = 1
-        end
-    end
-
-    # calculate Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    # calculate Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
     M  = F.M_tmp
     pᵥ = Fᵥ.p_tmp
     Rᵥ = UpperTriangular(Fᵥ.R)
+    Rᵤ = UpperTriangular(Fᵤ.R)
     inv_P!(pᵥ, Fᵥ.pᵀ)
     copyto!(F.L, I) # I
-    lmul_D!(inv_dᵥ_max, F.L) # Dᵥ₊⁻¹
-    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    mul_P!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    mul_P!(F.L, Fᵤ.pᵀ, M) # Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    lmul!(Fᵤ.R, F.L) # Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    lmul_D!(dᵤ_min, F.L) # Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹
+    mul_P!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
+    mul_P!(F.L, Fᵤ.pᵀ, M) # Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
+    lmul!(Rᵤ, F.L) # Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
 
-    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
-    M′  = Fᵥ.M_tmp
+    # calculate Dᵤ₋⋅[Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹]⋅Dᵥ₊⁻¹
+    @fastmath @inbounds for i in eachindex(dᵥ_max)
+        for j in eachindex(dᵤ_min)
+            F.L[j,i] *= dᵤ_min[j]/dᵥ_max[i]
+        end
+    end
+
+    # calcualte Lᵤᵀ⋅Lᵥ
     Lᵤᵀ = Fᵤ.M_tmp
     adjoint!(Lᵤᵀ, Fᵤ.L)
-    copyto!(M, I) # I
-    lmul_D!(dᵥ_min, M) # Dᵥ₋
-    mul!(M′, Fᵥ.L, M) # Lᵥ⋅Dᵥ₋
-    mul!(M, Lᵤᵀ, M′) # Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
-    lmul_D!(inv_dᵤ_max, M) # Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
+    mul!(F.R, Lᵤᵀ, Fᵥ.L)
+
+    # calculate Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Lᵥ]⋅Dᵥ₋
+    @fastmath @inbounds for i in eachindex(dᵥ_min)
+        for j in eachindex(dᵤ_max)
+            F.R[j,i] *= dᵥ_min[i]/dᵤ_max[j]
+        end
+    end
 
     # calculate Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
-    @. F.L = F.L + M
+    @. F.L = F.L + F.R
 
     # calculate [L₀⋅D₀⋅R₀]⋅P₀ᵀ = [Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋]
     ldr!(F)
 
+    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
+    M′ = Fᵥ.M_tmp
+    inv!(M′, F)
+
     # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
-    inv!(M′, F) # [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
-    mul_D!(F.L, M′, inv_dᵤ_max) # [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
-    lmul_D!(inv_dᵥ_max, F.L) # Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
+    @fastmath @inbounds for i in eachindex(dᵤ_max)
+        for j in eachindex(dᵥ_max)
+            F.L[j,i] = M′[j,i] / dᵤ_max[i] / dᵥ_max[j]
+        end
+    end
 
     # calculate [L₁⋅D₁⋅R₁]⋅P₁ᵀ = Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
     ldr!(F)
@@ -370,8 +218,8 @@ end
 @doc raw"""
     inv_invUpV(G::AbstractMatrix, Fᵤ::LDR, Fᵥ::LDR;
                F::LDR=ldr(Fᵤ),
-               dᵤ_min::AbstractVector=similar(Fᵤ.d), inv_dᵤ_max::AbstractVector=similar(Fᵤ.d),
-               dᵥ_min::AbstractVector=similar(Fᵥ.d), inv_dᵥ_max::AbstractVector=similar(Fᵥ.d))
+               dᵤ_min::AbstractVector=similar(Fᵤ.d), dᵤ_max::AbstractVector=similar(Fᵤ.d),
+               dᵥ_min::AbstractVector=similar(Fᵥ.d), dᵥ_max::AbstractVector=similar(Fᵥ.d))
 
 Calculate the numerically stable inverse ``G = (U^{-1} + V)^{-1},`` where the matrices ``U`` and
 ``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
@@ -398,33 +246,17 @@ where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
 function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                      F::LDR{T}=ldr(Fᵤ),
                      dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-                     inv_dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
+                     dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
                      dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                     inv_dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
+                     dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
 
     # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
-    @inbounds @fastmath for i in eachindex(Fᵤ.d)
-        if abs(Fᵤ.d[i]) > 1
-            dᵤ_min[i]     = 1
-            inv_dᵤ_max[i] = 1/Fᵤ.d[i]
-        else
-            dᵤ_min[i]     = Fᵤ.d[i]
-            inv_dᵤ_max[i] = 1
-        end
-    end
+    @. dᵤ_min = min(Fᵤ.d, 1)
+    @. dᵤ_max = max(Fᵤ.d, 1)
+    @. dᵥ_min = min(Fᵥ.d, 1)
+    @. dᵥ_max = max(Fᵥ.d, 1)
 
-    # calculate Dᵥ₋ = min(Dᵥ,1) and Dᵥ₊⁻¹ = [max(Dᵥ,1)]⁻¹
-    @inbounds @fastmath for i in eachindex(Fᵥ.d)
-        if abs(Fᵥ.d[i]) > 1
-            dᵥ_min[i]     = 1
-            inv_dᵥ_max[i] = 1/Fᵥ.d[i]
-        else
-            dᵥ_min[i]     = Fᵥ.d[i]
-            inv_dᵥ_max[i] = 1
-        end
-    end
-
-    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    # calculate Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
     pᵥ = Fᵥ.p_tmp
     inv_P!(pᵥ, Fᵥ.pᵀ)
     Lᵤᵀ = Fᵤ.M_tmp
@@ -432,25 +264,51 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     Rᵥ = UpperTriangular(Fᵥ.R)
     M = F.M_tmp
     copyto!(F.L, I) # I
-    lmul_D!(inv_dᵥ_max, F.L) # Dᵥ₊⁻¹
-    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    mul!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    mul!(F.L, Lᵤᵀ, M) # Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    lmul_D!(inv_dᵤ_max, F.L) # Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹
+    mul_P!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
+    mul!(F.L, Lᵤᵀ, M) # Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
 
-    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ] = [Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹]
+    # calculate Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹]⋅Dᵥ₊⁻¹
+    @fastmath @inbounds for i in eachindex(dᵥ_max)
+        for j in eachindex(dᵤ_max)
+            F.L[j,i] = F.L[j,i] / dᵤ_max[j] / dᵥ_max[i]
+        end
+    end
+
+    # calculate Rᵤ⋅Pᵤᵀ⋅Lᵥ
+    Rᵤ = UpperTriangular(Fᵤ.R)
+    copyto!(F.R, Fᵥ.L) # Lᵥ
+    mul_P!(M, Fᵤ.pᵀ, F.R) # Pᵤᵀ⋅Lᵥ
+    mul!(F.R, Rᵤ, M) # Rᵤ⋅Pᵤᵀ⋅Lᵥ
+
+    # calculate Dᵤ₋⋅[Rᵤ⋅Pᵤᵀ⋅Lᵥ]⋅Dᵥ₋
+    @fastmath @inbounds for i in eachindex(dᵥ_min)
+        for j in eachindex(dᵤ_min)
+            F.R[j,i] = F.R[j,i] * dᵤ_min[j] * dᵥ_min[i]
+        end
+    end
+
+    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Lᵥ⋅Dᵥ₋
+    @. F.L = F.L + F.R
+
+    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ] = [Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Lᵥ⋅Dᵥ₋]
     ldr!(F)
 
+    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅
+    M′ = Fᵥ.M_tmp
+    inv!(M′, F)
+
     # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
-    inv!(M, F) # [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
-    mul_D!(F.L, dᵤ_min, M) # [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
-    lmul_D!(inv_dᵥ_max, F.L) # Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
+    @fastmath @inbounds for i in eachindex(dᵤ_min)
+        for j in eachindex(dᵥ_max)
+            F.L[j,i] = M′[j,i] * dᵤ_min[i] / dᵥ_max[j]
+        end
+    end
 
     # calculate [L₁⋅D₁⋅R₁⋅P₁ᵀ] = Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
     ldr!(F)
 
     # calculate Pᵥ⋅Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
-    Rᵤ = UpperTriangular(Fᵤ.R)
     copyto!(G, F) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]
     rmul!(G, Rᵤ) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ
     mul_P!(M, G, Fᵤ.pᵀ) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
@@ -460,21 +318,48 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     return nothing
 end
 
-"""
+
+@doc raw"""
     sign_det(F::LDR)
 
-Returns the sign/phase factor of the determinant for a matrix represented by the
-LDR factization `F`, which is calculated as the product of the diagonal matrix
-elements of `F.R`.
+Returns the sign/phase factor of the determinant for a matrix ``A`` represented by the
+LDR factorization `F`, which is calculated as
+```math
+\textrm{sgn}(\det A) = \det L \cdot \left( \prod_i R_{i,i} \right) \cdot \det P^T,
+```
+where ``A = [L D R]P^T.``
 """
-function sign_det(F::LDR{T}) where {T}
+function sign_det(F::LDR{T}) where {T<:Real}
 
-    sgn::T = 0
+    sgn::T = 1
     # calculate the product of diagonal elements of R matrix
     for i in eachindex(F.d)
-        rᵢ  = F.R[i,i]/abs(F.R[i,i])
+        rᵢ  = F.R[i,i]
         sgn = sgn * rᵢ
     end
+    # account for fact that det(F.L) = -1
+    sgn = -sgn
+    # multiply by det(Pᵀ) <==> sign/parity of pᵀ
+    sgn = sgn * sign_P(F.pᵀ)
+    # normalize
+    sgn = sgn/abs(sgn)
+
+    return sgn
+end
+
+function sign_det(F::LDR{T}) where {T<:Complex}
+
+    sgn::T = 1
+    # calculate the product of diagonal elements of R matrix
+    for i in eachindex(F.d)
+        rᵢ  = F.R[i,i]
+        sgn = sgn * rᵢ
+    end
+    # account of det(L) phase
+    sgn = sgn * det(F.L)
+    # multiply by det(Pᵀ) <==> sign/parity of pᵀ
+    sgn = sgn * sign_P(F.pᵀ)
+    # normalize
     sgn = sgn/abs(sgn)
 
     return sgn

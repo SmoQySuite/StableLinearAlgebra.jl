@@ -31,11 +31,8 @@ struct LDR{T<:Number, E<:Real} <: Factorization{T}
     "Permutation vector to represent permuation matrix ``P^T``."
     pᵀ::Vector{Int}
 
-    "Stores the elementary reflectors for calculatng ``AP = QR`` decomposition."
-    τ::Vector{T}
-
     "Workspace for calculating QR decomposition using LAPACK without allocations."
-    ws::QRWorkspace{T, E}
+    ws::QRPivotedWs{T, E}
 
     "A matrix for temporarily storing intermediate results so as to avoid dynamic memory allocations."
     M_tmp::Matrix{T}
@@ -70,17 +67,16 @@ function ldr(A::AbstractMatrix{T})::LDR{T} where {T}
 
     # allocate workspace for QR decomposition
     copyto!(L,A)
-    ws = QRWorkspace(L)
+    ws = QRPivotedWs(L)
     pᵀ = ws.jpvt
-    τ  = ws.τ
-
+ 
     # allocate arrays for storing intermediate results to avoid
     # dynamic memory allocations
     M_tmp = zeros(T,n,n)
     p_tmp = zeros(Int,n)
 
     # instantiate LDR decomposition
-    F = LDR(L,d,R,pᵀ,τ,ws,M_tmp,p_tmp)
+    F = LDR(L,d,R,pᵀ,ws,M_tmp,p_tmp)
 
     # calculate LDR decomposition
     ldr!(F, A)
@@ -127,10 +123,10 @@ of the matrix `F.L`.
 """
 function ldr!(F::LDR)
 
-    (; L, d, R, ws) = F
+    (; L, d, R, pᵀ, ws) = F
 
     # calclate QR decomposition
-    geqp3!(L, ws)
+    LAPACK.geqp3!(ws, L)
 
     # extract upper triangular matrix R
     R′ = UpperTriangular(L)
@@ -145,7 +141,75 @@ function ldr!(F::LDR)
     ldiv_D!(d, R)
 
     # construct L (same as Q) matrix
-    orgqr!(L, ws)
+    LAPACK.orgqr!(ws, L)
 
+    return nothing
+end
+
+
+"""
+    ldr!(F::LDR, I::UniformScaling)
+
+Update the LDR factorization `F` to reflect the identity matrix.
+"""
+function ldr!(F::LDR, I::UniformScaling)
+
+    N = length(F.d)
+    copyto!(F.L, I)
+    @. F.d = 1
+    copyto!(F.R, I)
+    @. F.pᵀ = 1:N
+
+    return nothing
+end
+
+
+@doc raw"""
+    ldrs(A::AbstractMatrix{T}, N::Int) where {T}
+
+Return a vector of `N` LDR factorizations, where each one represent the matrix `A`.
+"""
+function ldrs(A::AbstractMatrix{T}, N::Int) where {T}
+    
+    Fs = Vector{LDR{T}}(undef,0)
+    for i in 1:N
+        push!(Fs, ldr(A))
+    end
+    return Fs
+end
+
+
+@doc raw"""
+    ldrs(A::AbstractArray{T,3}) where {T}
+
+Return a vector of `size(A, 3)` LDR factorizations, where there is an
+LDR factorization for each matrix `A[:,:,i]`.
+"""
+function ldrs(A::AbstractArray{T,3}) where {T}
+    
+    Fs = Vector{LDR{T}}(undef,0)
+    N  = size(A,3)
+    for i in 1:N
+        Aᵢ = @view A[:,:,i]
+        push!(Fs, ldr(Aᵢ))
+    end
+    
+    return Fs
+end
+
+
+@doc raw"""
+    ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
+
+Update the vector `Fs` of LDR factorization based on the sequence of matrices
+contained in `A`.
+"""
+function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
+    
+    for i in 1:size(A,3)
+        Aᵢ = @view A[:,:,i]
+        ldr!(Fs[i], Aᵢ)
+    end
+    
     return nothing
 end

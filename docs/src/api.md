@@ -6,6 +6,8 @@
 LDR
 ldr
 ldr!
+ldrs
+ldrs!
 ```
 
 ### Overloaded Functions
@@ -22,9 +24,6 @@ LinearAlgebra.det
 ### Exported Functions
 
 ```@docs
-chain_mul!
-chain_lmul!
-chain_rmul!
 inv!
 inv_IpA!
 inv_UpV!
@@ -38,9 +37,12 @@ abs_det_ratio
 
 ```@docs
 StableLinearAlgebra.mul_D!
+StableLinearAlgebra.div_D!
 StableLinearAlgebra.lmul_D!
 StableLinearAlgebra.rmul_D!
 StableLinearAlgebra.ldiv_D!
+StableLinearAlgebra.rdiv_D!
 StableLinearAlgebra.mul_P!
 StableLinearAlgebra.inv_P!
+StableLinearAlgebra.sign_P
 ```

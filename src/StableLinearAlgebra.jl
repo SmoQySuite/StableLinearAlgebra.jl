@@ -1,9 +1,7 @@
 module StableLinearAlgebra
 
 using LinearAlgebra
-
-# wraps QR decomposition methods from LAPACK so as to avoid unnecessary memory allocations
-include("qr.jl")
+using FastLapackInterface
 
 # define LDR decomposition
 include("LDR.jl")
@@ -18,8 +16,7 @@ include("overloaded_functions.jl")
 
 # define exported functions/methods
 include("exported_functions.jl")
-export LDR, ldr, ldr!
-export chain_mul!, chain_lmul!, chain_rmul!
+export LDR, ldr, ldr!, ldrs, ldrs!
 export inv!, inv_IpA!, inv_UpV!, inv_invUpV!
 export abs_det, sign_det, abs_det_ratio
 
