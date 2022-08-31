@@ -9,30 +9,30 @@ size(F::LDR, dims) = size(F.L, dims)
 
 
 @doc raw"""
-    copyto!(A::AbstractMatrix, F::LDR)
+    copyto!(A::AbstractMatrix{T}, F::LDR{T};
+            M{T}::AbstractMatrix=similar(A)) where {T}
 
 Copy the matrix represented by the LDR decomposition `F` into the matrix `A`.
 """
-function copyto!(A::AbstractMatrix{T}, F::LDR{T}) where {T}
+function copyto!(A::AbstractMatrix{T}, F::LDR{T}; M::AbstractMatrix{T}=similar(A)) where {T}
 
     @assert size(A) == size(F)
 
     (; L, pᵀ) = F
     d = F.d
     R = UpperTriangular(F.R)
-    A′ = F.M_tmp
 
     # A = L⋅D⋅R⋅Pᵀ
-    mul_D!(A′, L, d) # A = L⋅D
-    rmul!(A′, R) # A = (L⋅D)⋅R
-    mul_P!(A, A′, pᵀ) # A = (L⋅D⋅R)⋅Pᵀ
+    mul_D!(M, L, d) # A = L⋅D
+    rmul!(M, R) # A = (L⋅D)⋅R
+    mul_P!(A, M, pᵀ) # A = (L⋅D⋅R)⋅Pᵀ
 
     return nothing
 end
 
 
 @doc raw"""
-    copyto!(F::LDR, A)
+    copyto!(F::LDR{T}, A::AbstractMatrix{T}) where {T}
 
 Copy the matrix `A` to the LDR factorization `F`, calculating the
 LDR factorization to represent `A`.
@@ -58,7 +58,10 @@ end
 
 
 @doc raw"""
-    lmul!(B::AbstractMatrix, F::LDR; tmp=similar(B))
+    lmul!(B::AbstractMatrix{T}, F::LDR{T};
+          M::AbstractMatrix{T}=similar(B),
+          M′::AbstractMatrix{T}=similar(B),
+          p::AbstractMatrix{Int}=similar(F.pᵀ)) where {T}
 
 Calculate the numerically stable product ``A = B A,`` where the matrix ``A`` is
 represented by the LDR factorization `F`, updating `F` in-place to represent the product ``B A.``
@@ -76,36 +79,40 @@ A = & BA\\
 \end{align*}
 ```
 """
-function lmul!(B::AbstractMatrix{T}, F::LDR{T}; tmp::AbstractMatrix{T}=similar(B)) where {T}
+function lmul!(B::AbstractMatrix{T}, F::LDR{T};
+               M::AbstractMatrix{T}=similar(B),
+               M′::AbstractMatrix{T}=similar(B),
+               p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
     # B⋅L
-    mul!(F.M_tmp, B, F.L)
+    mul!(M, B, F.L)
 
     # B⋅L⋅D
-    mul_D!(F.L, F.M_tmp, F.d)
+    mul_D!(F.L, M, F.d)
 
     # store current R and pᵀ arrays
-    pᵀ_prev = F.p_tmp
-    R_prev = F.M_tmp
-    copyto!(R_prev, F.R)
-    copyto!(pᵀ_prev, F.pᵀ)
+    copyto!(M, F.R)
+    copyto!(p, F.pᵀ)
 
     # calculate new L′⋅D′⋅R′⋅P′ᵀ decomposition
     ldr!(F)
 
     # R′ = R′⋅P′ᵀ⋅R
-    mul_P!(tmp, F.R, F.pᵀ) # R′⋅P′ᵀ
-    mul!(F.R, tmp, R_prev) # R′⋅P′ᵀ⋅R
+    mul_P!(M′, F.R, F.pᵀ) # R′⋅P′ᵀ
+    mul!(F.R, M′, M) # R′⋅P′ᵀ⋅R
 
     # P′ᵀ = Pᵀ
-    copyto!(F.pᵀ, pᵀ_prev)
+    copyto!(F.pᵀ, p)
 
     return nothing
 end
 
 
 @doc raw"""
-    lmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
+    lmul!(F₂::LDR{T}, F₁::LDR{T};
+          M::AbstractMatrix{T}=similar(F.L),
+          M′::AbstractMatrix{T}=similar(F.L),
+          p::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
 Calculate the matrix product ``C = B C,`` represented by the LDR factorization `F₂` and `F₁`
 respectively, where `F₁` is updated in-place.
@@ -125,13 +132,16 @@ C = & B C\\
 \end{align*}
 ```
 """
-function lmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
+function lmul!(F₂::LDR{T}, F₁::LDR{T};
+               M::AbstractMatrix{T}=similar(F₁.L),
+               M′::AbstractMatrix{T}=similar(F₁.L),
+               p::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
     # store R₁ and P₁ᵀ
-    copyto!(F₁.M_tmp, F₁.R)
-    R₁ = UpperTriangular(F₁.M_tmp)
-    copyto!(F₁.p_tmp, F₁.pᵀ)
-    p₁ᵀ = F₁.p_tmp
+    copyto!(M, F₁.R)
+    R₁ = UpperTriangular(M)
+    copyto!(p, F₁.pᵀ)
+    p₁ᵀ = p
 
     # calculate R₂⋅P₂ᵀ⋅L₁
     mul_P!(F₁.L, F₂.pᵀ, F₁.L) # P₂ᵀ⋅L₁
@@ -150,12 +160,12 @@ function lmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
     F₃ = F₁
 
     # calcualte L₃ = L₂⋅L₃
-    L₂L₃ = F₂.M_tmp
+    L₂L₃ = M′
     mul!(L₂L₃, F₂.L, F₃.L)
     copyto!(F₃.L, L₂L₃)
 
     # calcualte R₃ = R₃⋅P₃ᵀ⋅R₁
-    R₃P₃ᵀ = F₂.M_tmp
+    R₃P₃ᵀ = M′
     mul_P!(R₃P₃ᵀ, F₃.R, F₃.pᵀ) # R₃⋅P₃ᵀ
     mul!(F₃.R, R₃P₃ᵀ, R₁) # R₃⋅P₃ᵀ⋅R₁
 
@@ -167,7 +177,9 @@ end
 
 
 @doc raw"""
-    rmul!(F::LDR, B::AbstractMatrix; tmp=similar(B))
+    rmul!(F::LDR{T}, B::AbstractMatrix{T};
+          M::AbstractMatrix{T}=similar(B),
+          M′::AbstractMatrix{T}=similar(B)) where {T}
 
 Calculate the numerically stable product ``A = A B,`` where the matrix ``A`` is
 represented by the LDR factorization `F`, updating `F` in-place to represent the product ``A B.``
@@ -185,35 +197,39 @@ A = & AB\\
 \end{align*}
 ```
 """
-function rmul!(F::LDR{T}, B::AbstractMatrix{T}; tmp::AbstractMatrix{T}=similar(B)) where {T}
+function rmul!(F::LDR{T}, B::AbstractMatrix{T};
+               M::AbstractMatrix{T}=similar(B),
+               M′::AbstractMatrix{T}=similar(B)) where {T}
 
-    (; L, d, pᵀ, M_tmp) = F
+    (; L, d, pᵀ) = F
     R = UpperTriangular(F.R)
 
     # P₀ᵀ⋅B
-    mul_P!(tmp, pᵀ, B)
+    mul_P!(M, pᵀ, B)
 
     # R₀⋅P₀ᵀ⋅B
-    lmul!(R, tmp)
+    lmul!(R, M)
 
     # D₀⋅R₀⋅P₀ᵀ⋅B
-    mul_D!(F.R, d, tmp)
-    copyto!(tmp, L) # store L₀ for later use
+    mul_D!(F.R, d, M)
+    copyto!(M, L) # store L₀ for later use
     copyto!(L, F.R)
 
     # caluclate new LDR decmposition given by [L₁⋅D₁⋅R₁⋅P₁ᵀ] = (D₀⋅R₀⋅P₀ᵀ⋅B)
     ldr!(F)
 
     # update LDR decomposition such that L₁ = L₀⋅L₁
-    mul!(M_tmp, tmp, L)
-    copyto!(L, M_tmp)
+    mul!(M′, M, L)
+    copyto!(L, M′)
 
     return nothing
 end
 
 
 @doc raw"""
-    rmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
+    rmul!(F₂::LDR{T}, F₁::LDR{T};
+          M::AbstractMatrix{T}=similar(F.L),
+          M′::AbstractMatrix{T}=similar(F.L)) where {T}
 
 Calculate the matrix product ``B = B C,`` represented by the LDR factorization `F₂` and `F₁`
 respectively, where `F₂` is updated in-place.
@@ -233,10 +249,12 @@ B = & B C\\
 \end{align*}
 ```
 """
-function rmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
+function rmul!(F₂::LDR{T}, F₁::LDR{T};
+               M::AbstractMatrix{T}=similar(F.L),
+               M′::AbstractMatrix{T}=similar(F.L)) where {T}
 
     # store L₂
-    L₂ = F₂.M_tmp
+    L₂ = M
     copyto!(L₂, F₂.L)
 
     # calculate R₂⋅P₂ᵀ⋅L₁
@@ -256,12 +274,12 @@ function rmul!(F₂::LDR{T}, F₁::LDR{T}) where {T}
     F₃ = F₂
 
     # calcualte L₃ = L₂⋅L₃
-    L₂L₃ = F₁.M_tmp
+    L₂L₃ = M′
     mul!(L₂L₃, L₂, F₃.L)
     copyto!(F₃.L, L₂L₃)
 
     # calcualte R₃ = R₃⋅P₃ᵀ⋅R₁
-    R₃P₃ᵀ = F₁.M_tmp
+    R₃P₃ᵀ = M
     mul_P!(R₃P₃ᵀ, F₃.R, F₃.pᵀ) # R₃⋅P₃ᵀ
     mul!(F₃.R, R₃P₃ᵀ, F₁.R) # R₃⋅P₃ᵀ⋅R₁
 
@@ -273,28 +291,31 @@ end
 
 
 @doc raw"""
-    mul!(A::AbstractMatrix, F::LDR, B::AbstractMatrix)
+    mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T};
+         M::AbstractMatrix{T} = similar(A)) where {T}
 
 Calculate the matrix product ``A = M B,`` where the matrix ``M`` is represented
 by the LDR factorization `F`.
 """
-function mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T}) where {T}
+function mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T};
+              M::AbstractMatrix{T}=similar(A)) where {T}
 
-    (; L, d, pᵀ, M_tmp) = F
+    (; L, d, pᵀ) = F
     R = UpperTriangular(F.R)
 
     # calculate A = (L⋅D⋅R⋅Pᵀ)⋅B
-    mul_P!(M_tmp, pᵀ, B)
-    lmul!(R, M_tmp)
-    lmul_D!(d, M_tmp)
-    mul!(A, L, M_tmp)
+    mul_P!(M, pᵀ, B)
+    lmul!(R, M)
+    lmul_D!(d, M)
+    mul!(A, L, M)
 
     return nothing
 end
 
 
 @doc raw"""
-    mul!(F′::LDR, B::AbstractMatrix, F::LDR)
+    mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
+         M::AbstractMatrix{T}=similar(F.L)) where {T}
 
 Calculate the numerically stable product ``C = B A,`` where the matrices
 ``C`` and ``A`` are represented by the LDR decompositions `F′` and `F` respectively.
@@ -311,7 +332,8 @@ C = & BA\\
 \end{align*}
 ```
 """
-function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T}) where {T}
+function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
+              M::AbstractMatrix{T}=similar(F.L)) where {T}
 
     L  = F.L
     d  = F.d
@@ -323,15 +345,15 @@ function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T}) where {T}
     p′ᵀ = F′.pᵀ
 
     # calculate L′ = B⋅L⋅D
-    mul_D!(F.M_tmp, L, d) # L⋅D
-    mul!(L′, B, F.M_tmp) # B⋅(L⋅D)
+    mul_D!(M, L, d) # L⋅D
+    mul!(L′, B, M) # B⋅(L⋅D)
 
     # update/calculate F′ = [L′⋅D′⋅R′⋅P′ᵀ] decomposition for (B⋅L⋅D)
     ldr!(F′)
 
     # calculate R′ = R′⋅P′ᵀ⋅R
-    mul_P!(F′.M_tmp, p′ᵀ, R′) # (R′⋅P′ᵀ)
-    mul!(F′.R, F′.M_tmp, R) # (R′⋅P′ᵀ)⋅R
+    mul_P!(M, p′ᵀ, R′) # (R′⋅P′ᵀ)
+    mul!(F′.R, M, R) # (R′⋅P′ᵀ)⋅R
 
     # set P′ᵀ = Pᵀ (P′ = P)
     copyto!(p′ᵀ, pᵀ)
@@ -341,7 +363,8 @@ end
 
 
 @doc raw"""
-    mul!(F′::LDR, F::LDR, B::AbstractMatrix)
+    mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T};
+         M::AbstractMatrix{T}) where {T}
     
 Calculate the numerically stable product ``C = A B,`` where the matrices
 ``C`` and ``A`` are represented by the LDR decompositions `F′` and `F` respectively.
@@ -358,13 +381,13 @@ C = & AB\\
 \end{align*}
 ```
 """
-function mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T}) where {T}
+function mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T};
+              M::AbstractMatrix{T}) where {T}
 
     L  = F.L
     d  = F.d
     R  = UpperTriangular(F.R)
     pᵀ = F.pᵀ
-    M  = F.M_tmp
     L′  = F′.L
 
     # calculate D⋅R⋅Pᵀ⋅B
@@ -384,7 +407,8 @@ end
 
 
 @doc raw"""
-    mul!(F₃::LDR, F₂::LDR, F₁::LDR)
+    mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T};
+         M::AbstractMatrix{T}) where {T}
 
 Calculate the numerically stable product ``A = B C,`` where
 each matrix is represented by the LDR decompositions `F₃`, `F₂` and `F₁` respectively.
@@ -404,9 +428,8 @@ A = & BC\\
 \end{align*}
 ```
 """
-function mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T}) where {T}
-
-    M_tmp = F₃.M_tmp
+function mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T};
+              M::AbstractMatrix{T}) where {T}
 
     # calulcate R₂⋅P₂ᵀ⋅L₁
     mul_P!(F₃.L, F₂.pᵀ, F₁.L) # P₂ᵀ⋅L₁
@@ -423,12 +446,12 @@ function mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T}) where {T}
     ldr!(F₃)
 
     # calculate L₃ = L₂⋅L₃
-    mul!(M_tmp, F₂.L, F₃.L)
-    copyto!(F₃.L, M_tmp)
+    mul!(M, F₂.L, F₃.L)
+    copyto!(F₃.L, M)
 
     # calculate R₃ = R₃⋅P₃ᵀ⋅R₁
-    mul_P!(M_tmp, F₃.R, F₃.pᵀ) # R′⋅Pᵀ
-    mul!(F₃.R, M_tmp, F₁.R) # (R′⋅Pᵀ)⋅R₁
+    mul_P!(M, F₃.R, F₃.pᵀ) # R′⋅Pᵀ
+    mul!(F₃.R, M, F₁.R) # (R′⋅Pᵀ)⋅R₁
 
     # P₃ᵀ = P₁ᵀ
     copyto!(F₃.pᵀ, F₁.pᵀ)
@@ -438,11 +461,17 @@ end
 
 
 @doc raw"""
-    det(F::LDR)
+    det(F::LDR{T}) where {T<:Real}
+    det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
 Return the determinant of the LDR factorization `F`.
 """
-function det(F::LDR)
+function det(F::LDR{T}) where {T<:Real}
 
     return sign_det(F) * abs_det(F, as_log=false)
+end
+
+function det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
+
+    return sign_det(F, M=M) * abs_det(F, as_log=false)
 end

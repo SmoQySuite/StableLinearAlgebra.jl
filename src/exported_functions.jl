@@ -1,17 +1,19 @@
 @doc raw"""
-    inv!(A::AbstractMatrix, F::LDR)
+    inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
+         M::AbstractMatrix{T}=similar(F.L),
+         p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
 Calculate the inverse of a matrix ``A`` represented of the LDR decomposition `F`,
 writing the inverse matrix `A⁻¹`.
 """
-function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}) where {T}
+function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
+              M::AbstractMatrix{T}=similar(F.L),
+              p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
     # calculate inverse A⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
     L   = F.L
     d   = F.d
     R   = UpperTriangular(F.R)
-    M   = F.M_tmp
-    p   = F.p_tmp
     inv_P!(p, F.pᵀ)
     adjoint!(M, L) # A⁻¹ = Lᵀ
     ldiv_D!(d, M) # A⁻¹ = D⁻¹⋅Lᵀ
@@ -23,15 +25,18 @@ end
 
 
 @doc raw"""
-    inv!(F::LDR)
+    inv!(F::LDR{T};
+         M::AbstractMatrix{T},
+         p::AbstractVector{Int}) where {T}
 
 Invert the LDR decomposition `F` in-place.
 """
-function inv!(F::LDR)
+function inv!(F::LDR{T};
+              M::AbstractMatrix{T},
+              p::AbstractVector{Int}) where {T}
 
     # given F = [L⋅D⋅R⋅Pᵀ], calculate F⁻¹ = [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ in-place
-    p  = F.p_tmp
-    Lᵀ = F.M_tmp
+    Lᵀ = M
     adjoint!(Lᵀ, F.L)
     ldiv_D!(F.d, Lᵀ) # D⁻¹⋅Lᵀ
     R = UpperTriangular(F.R)
@@ -45,7 +50,12 @@ end
 
 
 @doc raw"""
-    inv_IpA!(G::AbstractMatrix, F::LDR; F′::LDR=ldr(F), d_min=similar(F.d), d_max=similar(F.d))
+    inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
+             F′::LDR{T}=ldr(F),
+             d_min::AbstractVector{T}=similar(F.d),
+             d_max::AbstractVector{T}=similar(F.d),
+             M::AbstractMatrix{T}=similar(F.L),
+             p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
 Given a matrix ``A`` represented by the LDR factorization `F`, calculate the numerically stabalized inverse
 ```math
@@ -73,14 +83,16 @@ where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
 function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
                   F′::LDR{T}=ldr(F),
                   d_min::AbstractVector{T}=similar(F.d),
-                  d_max::AbstractVector{T}=similar(F.d)) where {T}
+                  d_max::AbstractVector{T}=similar(F.d),
+                  M::AbstractMatrix{T}=similar(F.L),
+                  p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
     # construct Dmin = min(D,1) and Dmax⁻¹ = [max(D,1)]⁻¹ matrices
     @. d_min = min(F.d, 1)
     @. d_max = max(F.d, 1)
 
     # define the original P₀, R₀⁻¹
-    p₀ = F.p_tmp
+    p₀ = p
     inv_P!(p₀, F.pᵀ)
     R₀ = UpperTriangular(F.R)
 
@@ -91,10 +103,10 @@ function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
     copyto!(G, I)
     ldiv_D!(d_max, G) # Dmax⁻¹
     ldiv!(R₀, G) # R₀⁻¹⋅Dmax⁻¹
-    mul_P!(F′.M_tmp, p₀, G) # P₀⋅R₀⁻¹⋅Dmax⁻¹
+    mul_P!(M, p₀, G) # P₀⋅R₀⁻¹⋅Dmax⁻¹
 
     # calculate LDR decomposition of L⋅D⋅R⋅Pᵀ = [P₀⋅R₀⁻¹⋅Dmax⁻¹ + L₀⋅Dmin]
-    @. F′.L = F′.L + F′.M_tmp
+    @. F′.L = F′.L + M
     ldr!(F′)
 
     # invert the LDR decomposition, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
@@ -107,19 +119,26 @@ function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
     ldr!(F′)
 
     # G = P₀⋅R₀⁻¹⋅F
-    copyto!(F.M_tmp, F′)
-    ldiv!(R₀, F.M_tmp)
-    mul_P!(G, p₀, F.M_tmp)
+    copyto!(M, F′)
+    ldiv!(R₀, M)
+    mul_P!(G, p₀, M)
 
     return nothing
 end
 
 
 @doc raw"""
-    inv_UpV(G::AbstractMatrix, Fᵤ::LDR, Fᵥ::LDR;
-            F::LDR=ldr(Fᵤ),
-            dᵤ_min::AbstractVector=similar(Fᵤ.d), dᵤ_max::AbstractVector=similar(Fᵤ.d),
-            dᵥ_min::AbstractVector=similar(Fᵥ.d), dᵥ_max::AbstractVector=similar(Fᵥ.d))
+    inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
+             F::LDR{T}=ldr(Fᵤ),
+             dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
+             dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
+             dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
+             dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
+             M::AbstractMatrix{T}=similar(Fᵥ.L),
+             M′::AbstractMatrix{T}=similar(Fᵥ.L),
+             M″::AbstractMatrix{T}=similar(Fᵥ.L),
+             p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
+             p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
 Calculate the numerically stable inverse ``G = (U + V)^{-1},`` where the matrices ``U`` and
 ``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
@@ -147,7 +166,12 @@ function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                   dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
                   dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
                   dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                  dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
+                  dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
+                  M::AbstractMatrix{T}=similar(Fᵥ.L),
+                  M′::AbstractMatrix{T}=similar(Fᵥ.L),
+                  M″::AbstractMatrix{T}=similar(Fᵥ.L),
+                  p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
+                  p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
     # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
     @. dᵤ_min = min(Fᵤ.d, 1)
@@ -156,8 +180,7 @@ function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     @. dᵥ_max = max(Fᵥ.d, 1)
 
     # calculate Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-    M  = F.M_tmp
-    pᵥ = Fᵥ.p_tmp
+    pᵥ = p
     Rᵥ = UpperTriangular(Fᵥ.R)
     Rᵤ = UpperTriangular(Fᵤ.R)
     inv_P!(pᵥ, Fᵥ.pᵀ)
@@ -175,7 +198,7 @@ function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     end
 
     # calcualte Lᵤᵀ⋅Lᵥ
-    Lᵤᵀ = Fᵤ.M_tmp
+    Lᵤᵀ = M
     adjoint!(Lᵤᵀ, Fᵤ.L)
     mul!(F.R, Lᵤᵀ, Fᵥ.L)
 
@@ -193,8 +216,7 @@ function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     ldr!(F)
 
     # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
-    M′ = Fᵥ.M_tmp
-    inv!(M′, F)
+    inv!(M′, F, M=M″, p=p′)
 
     # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
     @fastmath @inbounds for i in eachindex(dᵤ_max)
@@ -216,10 +238,16 @@ end
 
 
 @doc raw"""
-    inv_invUpV(G::AbstractMatrix, Fᵤ::LDR, Fᵥ::LDR;
-               F::LDR=ldr(Fᵤ),
-               dᵤ_min::AbstractVector=similar(Fᵤ.d), dᵤ_max::AbstractVector=similar(Fᵤ.d),
-               dᵥ_min::AbstractVector=similar(Fᵥ.d), dᵥ_max::AbstractVector=similar(Fᵥ.d))
+    inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
+                F::LDR{T}=ldr(Fᵤ),
+                dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
+                dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
+                dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
+                dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
+                M::AbstractMatrix{T}=similar(Fᵥ.L),
+                M′::AbstractMatrix{T}=similar(Fᵥ.L),
+                p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
+                p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
 Calculate the numerically stable inverse ``G = (U^{-1} + V)^{-1},`` where the matrices ``U`` and
 ``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
@@ -248,7 +276,11 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                      dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
                      dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
                      dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                     dᵥ_max::AbstractVector{T}=similar(Fᵥ.d)) where {T}
+                     dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
+                     M::AbstractMatrix{T}=similar(Fᵥ.L),
+                     M′::AbstractMatrix{T}=similar(Fᵥ.L),
+                     p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
+                     p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
     # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
     @. dᵤ_min = min(Fᵤ.d, 1)
@@ -257,16 +289,15 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     @. dᵥ_max = max(Fᵥ.d, 1)
 
     # calculate Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-    pᵥ = Fᵥ.p_tmp
+    pᵥ = p
     inv_P!(pᵥ, Fᵥ.pᵀ)
-    Lᵤᵀ = Fᵤ.M_tmp
+    Lᵤᵀ = M
     adjoint!(Lᵤᵀ, Fᵤ.L)
     Rᵥ = UpperTriangular(Fᵥ.R)
-    M = F.M_tmp
     copyto!(F.L, I) # I
     ldiv!(Rᵥ, F.L) # Rᵥ⁻¹
-    mul_P!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
-    mul!(F.L, Lᵤᵀ, M) # Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
+    mul_P!(M′, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
+    mul!(F.L, Lᵤᵀ, M′) # Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
 
     # calculate Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹]⋅Dᵥ₊⁻¹
     @fastmath @inbounds for i in eachindex(dᵥ_max)
@@ -278,8 +309,8 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     # calculate Rᵤ⋅Pᵤᵀ⋅Lᵥ
     Rᵤ = UpperTriangular(Fᵤ.R)
     copyto!(F.R, Fᵥ.L) # Lᵥ
-    mul_P!(M, Fᵤ.pᵀ, F.R) # Pᵤᵀ⋅Lᵥ
-    mul!(F.R, Rᵤ, M) # Rᵤ⋅Pᵤᵀ⋅Lᵥ
+    mul_P!(M′, Fᵤ.pᵀ, F.R) # Pᵤᵀ⋅Lᵥ
+    mul!(F.R, Rᵤ, M′) # Rᵤ⋅Pᵤᵀ⋅Lᵥ
 
     # calculate Dᵤ₋⋅[Rᵤ⋅Pᵤᵀ⋅Lᵥ]⋅Dᵥ₋
     @fastmath @inbounds for i in eachindex(dᵥ_min)
@@ -295,13 +326,12 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     ldr!(F)
 
     # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅
-    M′ = Fᵥ.M_tmp
-    inv!(M′, F)
+    inv!(M, F, M=M′, p=p′)
 
     # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
     @fastmath @inbounds for i in eachindex(dᵤ_min)
         for j in eachindex(dᵥ_max)
-            F.L[j,i] = M′[j,i] * dᵤ_min[i] / dᵥ_max[j]
+            F.L[j,i] = M[j,i] * dᵤ_min[i] / dᵥ_max[j]
         end
     end
 
@@ -320,7 +350,8 @@ end
 
 
 @doc raw"""
-    sign_det(F::LDR)
+    sign_det(F::LDR{T}) where {T<:Real}
+    sign_det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
 Returns the sign/phase factor of the determinant for a matrix ``A`` represented by the
 LDR factorization `F`, which is calculated as
@@ -337,7 +368,7 @@ function sign_det(F::LDR{T}) where {T<:Real}
         rᵢ  = F.R[i,i]
         sgn = sgn * rᵢ
     end
-    # account for fact that det(F.L) = -1
+    # account for sign of L
     sgn = -sgn
     # multiply by det(Pᵀ) <==> sign/parity of pᵀ
     sgn = sgn * sign_P(F.pᵀ)
@@ -347,7 +378,8 @@ function sign_det(F::LDR{T}) where {T<:Real}
     return sgn
 end
 
-function sign_det(F::LDR{T}) where {T<:Complex}
+function sign_det(F::LDR{T};
+                  M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
     sgn::T = 1
     # calculate the product of diagonal elements of R matrix
@@ -356,7 +388,8 @@ function sign_det(F::LDR{T}) where {T<:Complex}
         sgn = sgn * rᵢ
     end
     # account of det(L) phase
-    sgn = sgn * det(F.L)
+    copyto!(M,F.L)
+    sgn = sgn * det(LinearAlgebra.lu!(M))
     # multiply by det(Pᵀ) <==> sign/parity of pᵀ
     sgn = sgn * sign_P(F.pᵀ)
     # normalize
@@ -367,7 +400,7 @@ end
 
 
 @doc raw"""
-    abs_det(F::LDR; as_log::Bool=false)
+    abs_det(F::LDR{T}; as_log::Bool=false) where {T}
 
 Calculate the absolute value of determinant of the LDR factorization `F`.
 If `as_log=true`, then the log of the absolute value of the determinant is
@@ -381,7 +414,7 @@ Given an LDR factorization ``[L D R]P^T,`` calculate the absolute value of the d
 ```
 where ``D`` is a diagonal matrix with strictly positive real matrix elements.
 """
-function abs_det(F::LDR; as_log::Bool=false)
+function abs_det(F::LDR{T}; as_log::Bool=false) where {T}
 
     # calculate log(|det(A)|)
     absdet = 0.0
@@ -399,7 +432,10 @@ end
 
 
 @doc raw"""
-    abs_det_ratio(F₂::LDR, F₁::LDR, as_log::Bool=false)
+    abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
+                  as_log::Bool=false,
+                  p::AbstractVector{Int}=similar(F₁.pᵀ),
+                  p′::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
 Given two matrices ``A_2`` and ``A_1`` represented by the LDR factorizations
 `F₂` and `F₁` respectively, calculate the absolute value of the determinant ratio
@@ -421,22 +457,25 @@ for evaulating the absolute value of the determinant ratio is
 keeping in mind that the diagonal elements of ``D_1`` and ``D_2`` are stictly
 positive real numbers.
 """
-function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}; as_log::Bool=false) where {T}
+function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
+                       as_log::Bool=false,
+                       p::AbstractVector{Int}=similar(F₁.pᵀ),
+                       p′::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
-    @assert size(F′) == size(F)
-    p₁ = F₁.p_tmp
-    d₁ = F₁.d
-    p₂ = F₂.p_tmp
-    d₂ = F₂.d
+    @assert size(F₂) == size(F₁)
 
-    # sort the "pseudo-eigenvalues" from smallest to largest
-    sortperm!(p₁, d₁)
-    sortperm!(p₂, d₂)
+    # sort diagonal matrix elements of D₁
+    sortperm!(p, F₁.d)
+    d₁ = @view F₁.d[p]
+
+    # sort diagonal matrix elements of D₂
+    sortperm!(p′, F₂.d)
+    d₂ = @view F₂.d[p′]
 
     # calculat the log(|det(A₂/A₁)|) = log(|det(A₂)|) - log(|det(A₁)|)
     lndetR = 0.0
-    for i in eachindex(p)
-        lndetR = log(d₂[p₂[i]]) - log(d₁[p₁[i]])
+    for i in eachindex(d₁)
+        lndetR += log(d₂[i]) - log(d₁[i])
     end
 
     if as_log

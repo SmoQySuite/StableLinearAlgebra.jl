@@ -1,5 +1,5 @@
 @doc raw"""
-    LDR{T} <: Factorization{T}
+    LDR{T<:Number, E<:Real} <: Factorization{T}
 
 Represents the matrix factorization ``A P = L D R`` for a square matrix ``A,`` which may equivalently be
 written as ``A = (L D R) P^{-1} = (L D R) P^T``.
@@ -16,6 +16,13 @@ R &= \vert \textrm{diag}(R) \vert^{-1} R \\
 P &= P.
 \end{align*}
 ```
+
+# Fields
+
+- `L::Matrix{T}`: The unitary matrix ``L.``
+- `d::Vector{E}`: A vector representing the diagonal matrix ``D.``
+- `R::Matrix{T}`: The upper triangular matrix ``R.``
+- `pᵀ::Vector{Int}`: A permutation vector representing the permuation matrix ``P^T.``
 """
 struct LDR{T<:Number, E<:Real} <: Factorization{T}
 
@@ -33,12 +40,6 @@ struct LDR{T<:Number, E<:Real} <: Factorization{T}
 
     "Workspace for calculating QR decomposition using LAPACK without allocations."
     ws::QRPivotedWs{T, E}
-
-    "A matrix for temporarily storing intermediate results so as to avoid dynamic memory allocations."
-    M_tmp::Matrix{T}
-
-    "A vector for temporarily storing intermediate results so as to avoid dynamic memory allocations."
-    p_tmp::Vector{Int}
 end
 
 
@@ -69,14 +70,9 @@ function ldr(A::AbstractMatrix{T})::LDR{T} where {T}
     copyto!(L,A)
     ws = QRPivotedWs(L)
     pᵀ = ws.jpvt
- 
-    # allocate arrays for storing intermediate results to avoid
-    # dynamic memory allocations
-    M_tmp = zeros(T,n,n)
-    p_tmp = zeros(Int,n)
 
     # instantiate LDR decomposition
-    F = LDR(L,d,R,pᵀ,ws,M_tmp,p_tmp)
+    F = LDR(L,d,R,pᵀ,ws)
 
     # calculate LDR decomposition
     ldr!(F, A)
@@ -123,7 +119,7 @@ of the matrix `F.L`.
 """
 function ldr!(F::LDR)
 
-    (; L, d, R, pᵀ, ws) = F
+    (; L, d, R, ws) = F
 
     # calclate QR decomposition
     LAPACK.geqp3!(ws, L)
