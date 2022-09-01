@@ -1,4 +1,5 @@
 @doc raw"""
+    inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
          M::AbstractMatrix{T}=similar(F.L),
          p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
@@ -6,6 +7,12 @@
 Calculate the inverse of a matrix ``A`` represented of the LDR decomposition `F`,
 writing the inverse matrix `A⁻¹`.
 """
+function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    inv!(A⁻¹, F, M=ws.M, p=ws.p)
+    return nothing
+end
+
 function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
               M::AbstractMatrix{T}=similar(F.L),
               p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
@@ -25,12 +32,19 @@ end
 
 
 @doc raw"""
+    inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     inv!(F::LDR{T};
          M::AbstractMatrix{T},
          p::AbstractVector{Int}) where {T}
 
 Invert the LDR decomposition `F` in-place.
 """
+function inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    inv!(F, M=ws.M, p=ws.p)
+    return nothing
+end
+
 function inv!(F::LDR{T};
               M::AbstractMatrix{T},
               p::AbstractVector{Int}) where {T}
@@ -50,6 +64,8 @@ end
 
 
 @doc raw"""
+    inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
+             F′::LDR{T}=ldr(F)) where {T}
     inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
              F′::LDR{T}=ldr(F),
              d_min::AbstractVector{T}=similar(F.d),
@@ -80,6 +96,13 @@ G = & \left(I+A\right)^{-1}\\
 ```
 where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
 """
+function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
+                  F′::LDR{T}=ldr(F)) where {T}
+
+    inv_IpA!(G, F, F′=F′, d_min=ws.v, d_max=ws.v′, M=ws.M, p=ws.p)
+    return nothing
+end
+
 function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
                   F′::LDR{T}=ldr(F),
                   d_min::AbstractVector{T}=similar(F.d),
@@ -128,6 +151,8 @@ end
 
 
 @doc raw"""
+    inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
+             F::LDR{T}=ldr(Fᵥ)) where {T}
     inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
              F::LDR{T}=ldr(Fᵤ),
              dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -161,6 +186,14 @@ G = & \left(U+V\right)^{-1}\\
 ```
 where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
 """
+function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
+                  F::LDR{T}=ldr(Fᵥ)) where {T}
+
+    inv_UpV!(G, Fᵤ, Fᵥ, F=F, dᵤ_min=ws.v, dᵤ_max=ws.v′, dᵥ_min=ws.v″, dᵥ_max=ws.v‴,
+             M=ws.M, M′=ws.M′, M″=ws.M″, p=ws.p, p′=ws.p′)
+    return nothing
+end
+
 function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                   F::LDR{T}=ldr(Fᵤ),
                   dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -238,6 +271,8 @@ end
 
 
 @doc raw"""
+    inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
+                F::LDR{T}=ldr(F)) where {T}
     inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                 F::LDR{T}=ldr(Fᵤ),
                 dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -271,6 +306,14 @@ G = & \left(U^{-1}+V\right)^{-1}\\
 ```
 where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
 """
+function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
+                     F::LDR{T}=ldr(F)) where {T}
+
+    inv_invUpV!(G, Fᵤ, Fᵥ, F=F, dᵤ_min=ws.v, dᵤ_max=ws.v′, dᵥ_min=ws.v″, dᵥ_max=ws.v‴,
+                M=ws.M, M′=ws.M′, p=ws.p, p′=ws.p′)
+    return nothing
+end
+
 function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                      F::LDR{T}=ldr(Fᵤ),
                      dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -350,6 +393,7 @@ end
 
 
 @doc raw"""
+    sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     sign_det(F::LDR{T}) where {T<:Real}
     sign_det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
@@ -360,6 +404,11 @@ LDR factorization `F`, which is calculated as
 ```
 where ``A = [L D R]P^T.``
 """
+function sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Real}
+
+    return sign_det(F)
+end
+
 function sign_det(F::LDR{T}) where {T<:Real}
 
     sgn::T = 1
@@ -376,6 +425,11 @@ function sign_det(F::LDR{T}) where {T<:Real}
     sgn = sgn/abs(sgn)
 
     return sgn
+end
+
+function sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Complex}
+
+    return sign_det(F, M=ws.M)
 end
 
 function sign_det(F::LDR{T};
@@ -432,6 +486,8 @@ end
 
 
 @doc raw"""
+    abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T};
+                  as_log::Bool=false) where {T}
     abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
                   as_log::Bool=false,
                   p::AbstractVector{Int}=similar(F₁.pᵀ),
@@ -457,6 +513,12 @@ for evaulating the absolute value of the determinant ratio is
 keeping in mind that the diagonal elements of ``D_1`` and ``D_2`` are stictly
 positive real numbers.
 """
+function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T};
+                       as_log::Bool=false) where {T}
+
+    return abs_det_ratio(F₂, F₁, p=ws.p, p′=ws.p′, as_log=as_log)
+end
+
 function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
                        as_log::Bool=false,
                        p::AbstractVector{Int}=similar(F₁.pᵀ),

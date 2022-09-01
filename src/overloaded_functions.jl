@@ -9,11 +9,18 @@ size(F::LDR, dims) = size(F.L, dims)
 
 
 @doc raw"""
+    copyto!(A::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     copyto!(A::AbstractMatrix{T}, F::LDR{T};
             M{T}::AbstractMatrix=similar(A)) where {T}
 
 Copy the matrix represented by the LDR decomposition `F` into the matrix `A`.
 """
+function copyto!(A::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    copyto!(A, F, M=ws.M)
+    return nothing
+end
+
 function copyto!(A::AbstractMatrix{T}, F::LDR{T}; M::AbstractMatrix{T}=similar(A)) where {T}
 
     @assert size(A) == size(F)
@@ -58,6 +65,7 @@ end
 
 
 @doc raw"""
+    lmul!(B::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     lmul!(B::AbstractMatrix{T}, F::LDR{T};
           M::AbstractMatrix{T}=similar(B),
           M′::AbstractMatrix{T}=similar(B),
@@ -79,6 +87,12 @@ A = & BA\\
 \end{align*}
 ```
 """
+function lmul!(B::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    lmul!(B, F, M=ws.M, M′=ws.M′, p=ws.p)
+    return nothing
+end
+
 function lmul!(B::AbstractMatrix{T}, F::LDR{T};
                M::AbstractMatrix{T}=similar(B),
                M′::AbstractMatrix{T}=similar(B),
@@ -109,6 +123,7 @@ end
 
 
 @doc raw"""
+    lmul!(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
     lmul!(F₂::LDR{T}, F₁::LDR{T};
           M::AbstractMatrix{T}=similar(F.L),
           M′::AbstractMatrix{T}=similar(F.L),
@@ -132,6 +147,12 @@ C = & B C\\
 \end{align*}
 ```
 """
+function lmul!(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    lmul!(F₂, F₁, M=ws.M, M′=ws.M′, p=ws.p′)
+    return nothing
+end
+
 function lmul!(F₂::LDR{T}, F₁::LDR{T};
                M::AbstractMatrix{T}=similar(F₁.L),
                M′::AbstractMatrix{T}=similar(F₁.L),
@@ -177,6 +198,7 @@ end
 
 
 @doc raw"""
+    rmul!(F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
     rmul!(F::LDR{T}, B::AbstractMatrix{T};
           M::AbstractMatrix{T}=similar(B),
           M′::AbstractMatrix{T}=similar(B)) where {T}
@@ -197,6 +219,12 @@ A = & AB\\
 \end{align*}
 ```
 """
+function rmul!(F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace) where {T}
+
+    rmul!(F, B, M=ws.M, M′=ws.M′)
+    return nothing
+end
+
 function rmul!(F::LDR{T}, B::AbstractMatrix{T};
                M::AbstractMatrix{T}=similar(B),
                M′::AbstractMatrix{T}=similar(B)) where {T}
@@ -227,6 +255,7 @@ end
 
 
 @doc raw"""
+    rmul!(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
     rmul!(F₂::LDR{T}, F₁::LDR{T};
           M::AbstractMatrix{T}=similar(F.L),
           M′::AbstractMatrix{T}=similar(F.L)) where {T}
@@ -249,6 +278,12 @@ B = & B C\\
 \end{align*}
 ```
 """
+function rmul!(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    rmul!(F₂, F₁, M=ws.M, M′=ws.M′)
+    return nothing
+end
+
 function rmul!(F₂::LDR{T}, F₁::LDR{T};
                M::AbstractMatrix{T}=similar(F.L),
                M′::AbstractMatrix{T}=similar(F.L)) where {T}
@@ -291,12 +326,19 @@ end
 
 
 @doc raw"""
+    mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
     mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T};
          M::AbstractMatrix{T} = similar(A)) where {T}
 
 Calculate the matrix product ``A = M B,`` where the matrix ``M`` is represented
 by the LDR factorization `F`.
 """
+function mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+
+    mul!(A, F, B, M=ws.M)
+    return nothing
+end
+
 function mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T};
               M::AbstractMatrix{T}=similar(A)) where {T}
 
@@ -314,6 +356,7 @@ end
 
 
 @doc raw"""
+    mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
          M::AbstractMatrix{T}=similar(F.L)) where {T}
 
@@ -332,6 +375,12 @@ C = & BA\\
 \end{align*}
 ```
 """
+function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    mul!(F′, B, F, M=ws.M)
+    return nothing
+end
+
 function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
               M::AbstractMatrix{T}=similar(F.L)) where {T}
 
@@ -363,8 +412,9 @@ end
 
 
 @doc raw"""
+    mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
     mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T};
-         M::AbstractMatrix{T}) where {T}
+         M::AbstractMatrix{T}=similar(B)) where {T}
     
 Calculate the numerically stable product ``C = A B,`` where the matrices
 ``C`` and ``A`` are represented by the LDR decompositions `F′` and `F` respectively.
@@ -381,8 +431,14 @@ C = & AB\\
 \end{align*}
 ```
 """
+function mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+
+    mul!(F′, F, B, M=ws.M)
+    return nothing
+end
+
 function mul!(F′::LDR{T}, F::LDR{T}, B::AbstractMatrix{T};
-              M::AbstractMatrix{T}) where {T}
+              M::AbstractMatrix{T}=similar(B)) where {T}
 
     L  = F.L
     d  = F.d
@@ -407,6 +463,7 @@ end
 
 
 @doc raw"""
+    mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
     mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T};
          M::AbstractMatrix{T}) where {T}
 
@@ -428,6 +485,12 @@ A = & BC\\
 \end{align*}
 ```
 """
+function mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
+    mul!(F₃, F₂, F₁, M=ws.M)
+    return nothing
+end
+
 function mul!(F₃::LDR{T}, F₂::LDR{T}, F₁::LDR{T};
               M::AbstractMatrix{T}) where {T}
 
@@ -461,14 +524,25 @@ end
 
 
 @doc raw"""
+    det(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
     det(F::LDR{T}) where {T<:Real}
     det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
 Return the determinant of the LDR factorization `F`.
 """
+function det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Real}
+
+    return det(F::LDR{T})
+end
+
 function det(F::LDR{T}) where {T<:Real}
 
     return sign_det(F) * abs_det(F, as_log=false)
+end
+
+function det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Complex}
+
+    return det(F, M=ws.M)
 end
 
 function det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}

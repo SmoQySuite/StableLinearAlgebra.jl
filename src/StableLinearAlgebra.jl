@@ -5,6 +5,7 @@ using FastLapackInterface
 
 # define LDR decomposition
 include("LDR.jl")
+export LDR, LDRWorkspace, ldr, ldr!, ldrs, ldrs!, ldr_workspace
 
 # define developer functions/methods
 include("developer_functions.jl")
@@ -16,7 +17,6 @@ include("overloaded_functions.jl")
 
 # define exported functions/methods
 include("exported_functions.jl")
-export LDR, ldr, ldr!, ldrs, ldrs!
 export inv!, inv_IpA!, inv_UpV!, inv_invUpV!
 export abs_det, sign_det, abs_det_ratio
 

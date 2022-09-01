@@ -64,19 +64,12 @@ end
 
     # temporary matrices
     A = similar(B)
-    M = similar(B)
-    M′ = similar(B)
-    M″ = similar(B)
-
-    # temporary permutation vectors
-    p = ones(Int, N)
-    p′ = ones(Int, N)
 
     # partial propagator matrix product
     B̄ = Matrix{eltype(B)}(I,N,N)
     for i in 1:nstab
-        mul!(M, B, B̄)
-        copyto!(B̄, M)
+        mul!(A, B, B̄)
+        copyto!(B̄, A)
     end
 
     # array of partial propagator matrix producs
@@ -89,96 +82,93 @@ end
     # partial inverse propagator matrix product
     B̄⁻¹ = Matrix{eltype(B⁻¹)}(I,N,N)
     for i in 1:nstab
-        mul!(M, B⁻¹, B̄⁻¹)
-        copyto!(B̄⁻¹, M)
+        mul!(A, B⁻¹, B̄⁻¹)
+        copyto!(B̄⁻¹, A)
     end
-
-    # temporary storage vector
-    v_tmp  = zeros(eltype(B), N)
-    v′_tmp = zeros(eltype(B), N)
-    u_tmp  = zeros(eltype(B), N)
-    u′_tmp = zeros(eltype(B), N)
 
     # test ldr(::AbstractMatrix) and copyto!
     F = ldr(B̄)
-    copyto!(A, F, M=M)
+    ws = ldr_workspace(B̄)
+    copyto!(A, F, ws)
     @test A ≈ B̄
 
     # test ldr(::LDR) and copyto!
     F′ = ldr(F)
-    copyto!(A, F′, M=M)
+    ws = ldr_workspace(B̄)
+    copyto!(A, F′, ws)
     @test A ≈ B̄
 
     # testing LDR factorization with new matrix
     ldr!(F, B̄)
-    copyto!(A, F, M=M)
+    copyto!(A, F, ws)
     @test A ≈ B̄
 
     # test copying identity matrix to existing LDR factorization
     ldr!(F, I)
-    copyto!(A, F, M=M)
+    copyto!(A, F, ws)
     @test A ≈ I
 
     # testing lmul!(::AbstractMatrix, ::LDR) and inv_IpA!
+    F′ = ldr(F)
     ldr!(F, I)
     for n in 1:Nstab
-        lmul!(B̄, F, M=M, M′=M′, p=p)
+        lmul!(B̄, F, ws)
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test rmul!(::LDR, ::AbstractMatrix) and inv_IpA!
     ldr!(F, I)
     for n in 1:Nstab
-        rmul!(F, B̄, M=M, M′=M′)
+        rmul!(F, B̄, ws)
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test ldrs(::AbstractMatrix, ::Int), lmul!(::LDR, ::LDR) and inv_IpA!
     Fs = ldrs(B̄, Nstab)
     ldr!(F, I)
     for n in 1:Nstab
-        lmul!(Fs[n], F, M=M, M′=M′, p=p) 
+        lmul!(Fs[n], F, ws) 
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test ldrs!(::Vector{LDR}, ::AbstractArray{3}), rmul!(::LDR, ::LDR) and inv_IpA!
     ldrs!(Fs, B̄s)
     ldr!(F, I)
     for n in 1:Nstab
-        rmul!(F, Fs[n], M=M, M′=M′) 
+        rmul!(F, Fs[n], ws) 
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test mul!(::LDR, ::AbstractMatrix, ::LDR)
     ldr!(F, I)
     for n in 1:Nstab
-        mul!(F′, B̄, F, M=M)
+        mul!(F′, B̄, F, ws)
         copyto!(F, F′)
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test mul!(::LDR, ::LDR, ::AbstractMatrix)
     ldr!(F, I)
     for n in 1:Nstab
-        mul!(F′, F, B̄, M=M)
+        mul!(F′, F, B̄, ws)
         copyto!(F, F′)
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test mul!(::LDR, ::LDR, ::LDR)
     Fs = ldrs(B̄, Nstab)
     ldr!(F, I)
     for n in 1:Nstab
-        mul!(F′, Fs[n], F, M=M)
+        mul!(F′, Fs[n], F, ws)
         copyto!(F, F′)
     end
-    inv_IpA!(A, F, F′=F′, d_min=u_tmp, d_max=u′_tmp, M=M, p=p)
+    inv_IpA!(A, F, ws, F′=F′)
     @test A ≈ G_0
 
     # test inv_UpV!
@@ -186,47 +176,47 @@ end
     ldr!(F, I)
     ldr!(F′, I)
     for n in 1:Nstab÷2
-        lmul!(B̄⁻¹, F′, M=M, M′=M′, p=p)
-        rmul!(F, B̄, M=M, M′=M′)
+        lmul!(B̄⁻¹, F′, ws)
+        rmul!(F, B̄, ws)
     end
-    inv_UpV!(A, F′, F,
-             dᵤ_min=u_tmp, dᵤ_max=u′_tmp, dᵥ_min=v_tmp, dᵥ_max=v′_tmp,
-             F=F″, M=M, M′=M′, M″=M″, p=p, p′=p′)
+    inv_UpV!(A, F′, F, ws, F=F″)
     @test A ≈ G_βo2
 
     # test inv_invUpV!
     ldr!(F, I)
     ldr!(F′, I)
     for n in 1:Nstab÷2
-        rmul!(F, B̄, M=M, M′=M′)
+        rmul!(F, B̄, ws)
     end
     copyto!(F′, F)
-    inv_invUpV!(A, F, F′,
-                dᵤ_min=u_tmp, dᵤ_max=u′_tmp, dᵥ_min=v_tmp, dᵥ_max=v′_tmp,
-                F=F″, M=M, M′=M′, p=p, p′=p′)
+    inv_invUpV!(A, F, F′, ws, F=F″)
     @test A ≈ G_βo2
 
     # test determinant calculation
-    A = rand(Float64,10,10)
+    A  = rand(Float64,10,10)
+    ws = ldr_workspace(A)
     Fa = ldr(A)
-    @test det(A) ≈ det(Fa)
+    @test det(A) ≈ det(Fa, ws)
 
     # test determinant calculation
-    A = rand(Complex{Float64},10,10)
+    A  = rand(Complex{Float64},10,10)
+    ws = ldr_workspace(A)
     Fa = ldr(A)
-    @test det(A) ≈ det(Fa)
+    @test det(A) ≈ det(Fa, ws)
 
     # test determinant ratio calculation
-    A = rand(Float64,10,10)
-    B = rand(Float64,10,10) 
+    A  = rand(Float64,10,10)
+    B  = rand(Float64,10,10)
+    ws = ldr_workspace(A)
     Fa = ldr(A)
     Fb = ldr(B)
-    @test abs(det(A)/det(B)) ≈ abs_det_ratio(Fa,Fb)
+    @test abs(det(A)/det(B)) ≈ abs_det_ratio(Fa, Fb, ws)
 
     # test determinant ratio calculation
-    A = rand(Complex{Float64},10,10)
-    B = rand(Complex{Float64},10,10) 
+    A  = rand(Complex{Float64},10,10)
+    B  = rand(Complex{Float64},10,10)
+    ws = ldr_workspace(A)
     Fa = ldr(A)
     Fb = ldr(B)
-    @test abs(det(A)/det(B)) ≈ abs_det_ratio(Fa,Fb)
+    @test abs(det(A)/det(B)) ≈ abs_det_ratio(Fa, Fb, ws)
 end

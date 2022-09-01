@@ -44,6 +44,43 @@ end
 
 
 @doc raw"""
+    LDRWorkspace{T<:Number}
+
+A workspace to avoid temporary memory allocations when performing computations
+with an [`LDR`](@ref) factorization.
+"""
+struct LDRWorkspace{T<:Number}
+
+    "Temporary storage matrix."
+    M::Matrix{T}
+
+    "Temporary storage matrix."
+    M′::Matrix{T}
+
+    "Temporary storage matrix."
+    M″::Matrix{T}
+
+    "Temporary storage vector for permuation."
+    p::Vector{Int}
+
+    "Temporary storage vector for permuation."
+    p′::Vector{Int}
+
+    "Temporary storage vector."
+    v::Vector{T}
+
+    "Temporary storage vector."
+    v′::Vector{T}
+
+    "Temporary storage vector."
+    v″::Vector{T}
+
+    "Temporary storage vector."
+    v‴::Vector{T}
+end
+
+
+@doc raw"""
     ldr(A::AbstractMatrix)
 
 Calculate and return the LDR decomposition for the matrix `A`.
@@ -209,3 +246,34 @@ function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
     
     return nothing
 end
+
+@doc raw"""
+
+    ldr_workspace(A::AbstractMatrix)
+    ldr_workspace(F::LDR)
+    ldr_workspace(Fs::Vector{LDR})
+
+Return a workspace for an [`LDR`](@ref) factorization that can be used
+to avoid dynamic memory allocations.
+"""
+function ldr_workspace(A::AbstractMatrix)
+
+    @assert size(A,1) == size(A,2)
+
+    N  = size(A,1)
+    M  = similar(A)
+    M′ = similar(A)
+    M″ = similar(A)
+    p  = zeros(Int, N)
+    p′ = zeros(Int, N)
+    v  = zeros(eltype(A), N)
+    v′ = zeros(eltype(A), N)
+    v″ = zeros(eltype(A), N)
+    v‴ = zeros(eltype(A), N)
+    ws = LDRWorkspace(M, M′, M″, p, p′, v, v′, v″, v‴)
+
+    return ws
+end
+
+ldr_workspace(F::LDR) = ldr_workspace(F.L)
+ldr_workspace(Fs::Vector{LDR}) = ldr_workspace(Fs[1])

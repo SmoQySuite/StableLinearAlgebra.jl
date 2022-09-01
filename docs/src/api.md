@@ -8,6 +8,8 @@ ldr
 ldr!
 ldrs
 ldrs!
+LDRWorkspace
+ldr_workspace
 ```
 
 ### Overloaded Functions
