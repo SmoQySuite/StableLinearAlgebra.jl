@@ -1,10 +1,13 @@
 using StableLinearAlgebra
 using Documenter
+using DocumenterCitations
 using LinearAlgebra
 
 DocMeta.setdocmeta!(StableLinearAlgebra, :DocTestSetup, :(using StableLinearAlgebra); recursive=true)
+bib = CitationBibliography(joinpath(@__DIR__, "references.bib"), sorting = :nyt)
 
-makedocs(;
+makedocs(
+    bib,
     modules=[StableLinearAlgebra],
     authors="Benjamin Cohen-Stead <benwcs@gmail.com>",
     repo="https://github.com/cohensbw/StableLinearAlgebra.jl/blob/{commit}{path}#{line}",

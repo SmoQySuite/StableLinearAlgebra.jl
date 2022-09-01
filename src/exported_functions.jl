@@ -4,7 +4,7 @@
          M::AbstractMatrix{T}=similar(F.L),
          p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
-Calculate the inverse of a matrix ``A`` represented of the LDR decomposition `F`,
+Calculate the inverse of a matrix ``A`` represented of the [`LDR`](@ref) decomposition `F`,
 writing the inverse matrix `A⁻¹`.
 """
 function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
@@ -37,7 +37,7 @@ end
          M::AbstractMatrix{T},
          p::AbstractVector{Int}) where {T}
 
-Invert the LDR decomposition `F` in-place.
+Invert the [`LDR`](@ref) decomposition `F` in-place.
 """
 function inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
@@ -73,7 +73,7 @@ end
              M::AbstractMatrix{T}=similar(F.L),
              p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
-Given a matrix ``A`` represented by the LDR factorization `F`, calculate the numerically stabalized inverse
+Given a matrix ``A`` represented by the [`LDR`](@ref) factorization `F`, calculate the numerically stabalized inverse
 ```math
 G = (I + A)^{-1},
 ```
@@ -81,7 +81,7 @@ storing the result in the matrix `G`.
 
 # Algorithm
 
-Given an LDR factorization of ``A``, calculate ``G = (I + A)^{-1}`` using the procedure
+Given an [`LDR`](@ref) factorization of ``A``, calculate ``G = (I + A)^{-1}`` using the procedure
 ```math
 \begin{align*}
 G = & \left(I+A\right)^{-1}\\
@@ -166,7 +166,7 @@ end
              p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
 Calculate the numerically stable inverse ``G = (U + V)^{-1},`` where the matrices ``U`` and
-``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
+``V`` are represented by the [`LDR`](@ref) factorizations `Fᵤ` and `Fᵥ` respectively.
 
 # Algorithm
 
@@ -285,7 +285,7 @@ end
                 p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
 
 Calculate the numerically stable inverse ``G = (U^{-1} + V)^{-1},`` where the matrices ``U`` and
-``V`` are represented by the LDR factorizations `Fᵤ` and `Fᵥ` respectively.
+``V`` are represented by the [`LDR`](@ref) factorizations `Fᵤ` and `Fᵥ` respectively.
 
 # Algorithm
 
@@ -398,7 +398,7 @@ end
     sign_det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
 Returns the sign/phase factor of the determinant for a matrix ``A`` represented by the
-LDR factorization `F`, which is calculated as
+[`LDR`](@ref) factorization `F`, which is calculated as
 ```math
 \textrm{sgn}(\det A) = \det L \cdot \left( \prod_i R_{i,i} \right) \cdot \det P^T,
 ```
@@ -456,13 +456,13 @@ end
 @doc raw"""
     abs_det(F::LDR{T}; as_log::Bool=false) where {T}
 
-Calculate the absolute value of determinant of the LDR factorization `F`.
+Calculate the absolute value of determinant of the [`LDR`](@ref) factorization `F`.
 If `as_log=true`, then the log of the absolute value of the determinant is
 returned instead.
 
 # Algorithm
 
-Given an LDR factorization ``[L D R]P^T,`` calculate the absolute value of the determinant as
+Given an [`LDR`](@ref) factorization ``[L D R]P^T,`` calculate the absolute value of the determinant as
 ```math
 \exp\left\{ \sum_i \log(D[i]) \right\},
 ```
@@ -493,7 +493,7 @@ end
                   p::AbstractVector{Int}=similar(F₁.pᵀ),
                   p′::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
-Given two matrices ``A_2`` and ``A_1`` represented by the LDR factorizations
+Given two matrices ``A_2`` and ``A_1`` represented by the [`LDR`](@ref) factorizations
 `F₂` and `F₁` respectively, calculate the absolute value of the determinant ratio
 ``\vert\det(A_2/A_1)\vert`` in a numerically stable fashion. If `as_log=true`, then
 this function instead returns ``\log \left( \vert\det(A_2/A_1)\vert \right).``
@@ -501,7 +501,7 @@ this function instead returns ``\log \left( \vert\det(A_2/A_1)\vert \right).``
 # Algorithm
 
 Let ``A_1 = [L_1 D_1 R_1] P_1^T`` and ``A_2 = [L_2 D_2 R_2] P_1^T`` be ``N \times N``
-square matrices each represented by their respective LDR factorizations.
+square matrices each represented by their respective [`LDR`](@ref) factorizations.
 Let us define perumations ``p_1^{(1)} \dots p_1^{(i)} \dots p_1^{(N)}`` and 
 ``p_2^{(1)} \dots p_2^{(i)} \dots p_2^{(N)}`` that sort the diagonal elements
 of ``D_1`` and ``D_2`` from smallest to largest. Then a numerically stable expression

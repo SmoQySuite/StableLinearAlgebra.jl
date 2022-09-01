@@ -2,7 +2,7 @@
     size(F::LDR)
     size(F::LDR, dims)
 
-Return the size of the LDR decomposition `F`.
+Return the size of the [`LDR`](@ref) decomposition `F`.
 """
 size(F::LDR)       = size(F.L)
 size(F::LDR, dims) = size(F.L, dims)
@@ -13,7 +13,7 @@ size(F::LDR, dims) = size(F.L, dims)
     copyto!(A::AbstractMatrix{T}, F::LDR{T};
             M{T}::AbstractMatrix=similar(A)) where {T}
 
-Copy the matrix represented by the LDR decomposition `F` into the matrix `A`.
+Copy the matrix represented by the [`LDR`](@ref) decomposition `F` into the matrix `A`.
 """
 function copyto!(A::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
@@ -41,8 +41,8 @@ end
 @doc raw"""
     copyto!(F::LDR{T}, A::AbstractMatrix{T}) where {T}
 
-Copy the matrix `A` to the LDR factorization `F`, calculating the
-LDR factorization to represent `A`.
+Copy the matrix `A` to the [`LDR`](@ref) factorization `F`, calculating the
+[`LDR`](@ref) factorization to represent `A`.
 """
 copyto!(F::LDR, A::AbstractMatrix) = ldr!(F,A)
 copyto!(F::LDR, I::UniformScaling) = ldr!(F,I)
@@ -51,7 +51,7 @@ copyto!(F::LDR, I::UniformScaling) = ldr!(F,I)
 @doc raw"""
     copyto!(F′::LDR{T}, F::LDR{T}) where {T}
 
-Copy `F` LDR factorization to `F′`.
+Copy `F` [`LDR`](@ref) factorization to `F′`.
 """
 function copyto!(F′::LDR{T,E}, F::LDR{T,E}) where {T,E}
 
@@ -72,11 +72,11 @@ end
           p::AbstractMatrix{Int}=similar(F.pᵀ)) where {T}
 
 Calculate the numerically stable product ``A = B A,`` where the matrix ``A`` is
-represented by the LDR factorization `F`, updating `F` in-place to represent the product ``B A.``
+represented by the [`LDR`](@ref) factorization `F`, updating `F` in-place to represent the product ``B A.``
 
 # Algorithm
 
-Given a matrix ``A`` represented by an LDR factorization, update the LDR factorization to reflect
+Given a matrix ``A`` represented by an [`LDR`](@ref) factorization, update the [`LDR`](@ref) factorization to reflect
 the matrix product ``A=BA`` using the procedure
 ```math
 \begin{align*}
@@ -129,7 +129,7 @@ end
           M′::AbstractMatrix{T}=similar(F.L),
           p::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
 
-Calculate the matrix product ``C = B C,`` represented by the LDR factorization `F₂` and `F₁`
+Calculate the matrix product ``C = B C,`` represented by the [`LDR`](@ref) factorization `F₂` and `F₁`
 respectively, where `F₁` is updated in-place.
 
 # Algorithm
@@ -204,11 +204,11 @@ end
           M′::AbstractMatrix{T}=similar(B)) where {T}
 
 Calculate the numerically stable product ``A = A B,`` where the matrix ``A`` is
-represented by the LDR factorization `F`, updating `F` in-place to represent the product ``A B.``
+represented by the [`LDR`](@ref) factorization `F`, updating `F` in-place to represent the product ``A B.``
 
 # Algorithm
 
-Given a matrix ``A`` represented by an LDR factorization, update the LDR factorization to reflect
+Given a matrix ``A`` represented by an [`LDR`](@ref) factorization, update the [`LDR`](@ref) factorization to reflect
 the matrix product ``A=AB`` using the procedure
 ```math
 \begin{align*}
@@ -260,7 +260,7 @@ end
           M::AbstractMatrix{T}=similar(F.L),
           M′::AbstractMatrix{T}=similar(F.L)) where {T}
 
-Calculate the matrix product ``B = B C,`` represented by the LDR factorization `F₂` and `F₁`
+Calculate the matrix product ``B = B C,`` represented by the [`LDR`](@ref) factorization `F₂` and `F₁`
 respectively, where `F₂` is updated in-place.
 
 # Algorithm
@@ -331,7 +331,7 @@ end
          M::AbstractMatrix{T} = similar(A)) where {T}
 
 Calculate the matrix product ``A = M B,`` where the matrix ``M`` is represented
-by the LDR factorization `F`.
+by the [`LDR`](@ref) factorization `F`.
 """
 function mul!(A::AbstractMatrix{T}, F::LDR{T}, B::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 
@@ -361,7 +361,7 @@ end
          M::AbstractMatrix{T}=similar(F.L)) where {T}
 
 Calculate the numerically stable product ``C = B A,`` where the matrices
-``C`` and ``A`` are represented by the LDR decompositions `F′` and `F` respectively.
+``C`` and ``A`` are represented by the [`LDR`](@ref) decompositions `F′` and `F` respectively.
 
 # Algorithm
 
@@ -417,7 +417,7 @@ end
          M::AbstractMatrix{T}=similar(B)) where {T}
     
 Calculate the numerically stable product ``C = A B,`` where the matrices
-``C`` and ``A`` are represented by the LDR decompositions `F′` and `F` respectively.
+``C`` and ``A`` are represented by the [`LDR`](@ref) decompositions `F′` and `F` respectively.
 
 # Algorithm
 
@@ -468,7 +468,7 @@ end
          M::AbstractMatrix{T}) where {T}
 
 Calculate the numerically stable product ``A = B C,`` where
-each matrix is represented by the LDR decompositions `F₃`, `F₂` and `F₁` respectively.
+each matrix is represented by the [`LDR`](@ref) decompositions `F₃`, `F₂` and `F₁` respectively.
 
 # Algorithm
 
@@ -528,7 +528,7 @@ end
     det(F::LDR{T}) where {T<:Real}
     det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
-Return the determinant of the LDR factorization `F`.
+Return the determinant of the [`LDR`](@ref) factorization `F`.
 """
 function det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Real}
 

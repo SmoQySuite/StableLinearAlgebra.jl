@@ -83,7 +83,7 @@ end
 @doc raw"""
     ldr(A::AbstractMatrix)
 
-Calculate and return the LDR decomposition for the matrix `A`.
+Calculate and return the [`LDR`](@ref) decomposition for the matrix `A`.
 """
 function ldr(A::AbstractMatrix{T})::LDR{T} where {T}
 
@@ -121,7 +121,7 @@ end
 @doc raw"""
     ldr(F::LDR)
 
-Return a new LDR factorization that is a copy of `F`.
+Return a new [`LDR`](@ref) factorization that is a copy of `F`.
 """
 function ldr(F::LDR)
 
@@ -135,7 +135,7 @@ end
 @doc raw"""
     ldr!(F::LDR, A::AbstractMatrix)
 
-Calculate the LDR decomposition `F` for the matrix `A`.
+Calculate the [`LDR`](@ref) decomposition `F` for the matrix `A`.
 """
 function ldr!(F::LDR{T}, A::AbstractMatrix{T}) where {T}
 
@@ -151,7 +151,7 @@ end
 @doc raw"""
     ldr!(F::LDR)
 
-Re-calculate the LDR factorization `F` in-place based on the current contents
+Re-calculate the [`LDR`](@ref) factorization `F` in-place based on the current contents
 of the matrix `F.L`.
 """
 function ldr!(F::LDR)
@@ -183,7 +183,7 @@ end
 """
     ldr!(F::LDR, I::UniformScaling)
 
-Update the LDR factorization `F` to reflect the identity matrix.
+Update the [`LDR`](@ref) factorization `F` to reflect the identity matrix.
 """
 function ldr!(F::LDR, I::UniformScaling)
 
@@ -200,7 +200,7 @@ end
 @doc raw"""
     ldrs(A::AbstractMatrix{T}, N::Int) where {T}
 
-Return a vector of `N` LDR factorizations, where each one represent the matrix `A`.
+Return a vector of `N` [`LDR`](@ref) factorizations, where each one represent the matrix `A`.
 """
 function ldrs(A::AbstractMatrix{T}, N::Int) where {T}
     
@@ -215,8 +215,8 @@ end
 @doc raw"""
     ldrs(A::AbstractArray{T,3}) where {T}
 
-Return a vector of `size(A, 3)` LDR factorizations, where there is an
-LDR factorization for each matrix `A[:,:,i]`.
+Return a vector of [`LDR`](@ref) factorizations of length `size(A, 3)`, where there is an
+[`LDR`](@ref) factorization for each matrix `A[:,:,i]`.
 """
 function ldrs(A::AbstractArray{T,3}) where {T}
     
@@ -234,7 +234,7 @@ end
 @doc raw"""
     ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
 
-Update the vector `Fs` of LDR factorization based on the sequence of matrices
+Update the vector `Fs` of [`LDR`](@ref) factorization based on the sequence of matrices
 contained in `A`.
 """
 function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
@@ -253,8 +253,7 @@ end
     ldr_workspace(F::LDR)
     ldr_workspace(Fs::Vector{LDR})
 
-Return a workspace for an [`LDR`](@ref) factorization that can be used
-to avoid dynamic memory allocations.
+Return a [`LDRWorkspace`](@ref) that can be used to avoid dynamic memory allocations.
 """
 function ldr_workspace(A::AbstractMatrix)
 
