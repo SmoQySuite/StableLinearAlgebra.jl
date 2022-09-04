@@ -12,7 +12,7 @@ include("developer_functions.jl")
 
 # define overloaded functions/methods
 import Base: size, copyto!
-import LinearAlgebra: mul!, lmul!, rmul!, ldiv!, det
+import LinearAlgebra: mul!, lmul!, rmul!, ldiv!, rdiv!, det
 include("overloaded_functions.jl")
 
 # define exported functions/methods

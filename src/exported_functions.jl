@@ -1,10 +1,11 @@
 @doc raw"""
     inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
     inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
          M::AbstractMatrix{T}=similar(F.L),
          p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
-Calculate the inverse of a matrix ``A`` represented of the [`LDR`](@ref) decomposition `F`,
+Calculate the inverse of a matrix ``A`` represented of the [`LDR`](@ref) facorization `F`,
 writing the inverse matrix `A⁻¹`.
 """
 function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
@@ -33,11 +34,12 @@ end
 
 @doc raw"""
     inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
     inv!(F::LDR{T};
          M::AbstractMatrix{T},
          p::AbstractVector{Int}) where {T}
 
-Invert the [`LDR`](@ref) decomposition `F` in-place.
+Invert the [`LDR`](@ref) factorization `F` in-place.
 """
 function inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
@@ -66,6 +68,7 @@ end
 @doc raw"""
     inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
              F′::LDR{T}=ldr(F)) where {T}
+    
     inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
              F′::LDR{T}=ldr(F),
              d_min::AbstractVector{T}=similar(F.d),
@@ -90,8 +93,7 @@ G = & \left(I+A\right)^{-1}\\
   = & \left(\left[P_{a}R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min}\right]D_{a,\max}R_{a}P_{a}^{T}\right)^{-1}\\
   = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{P_{a}R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min}}})^{-1}\\
   = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}(L_{0}D_{0}R_{0}P_{0}^{T})^{-1}\\
-  = & P_{a}R_{a}^{-1}\overset{L_{1}D_{1}R_{1}P_{1}^{T}}{\overbrace{D_{a,\max}^{-1}P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}}}\\
-  = & P_{a}R_{a}^{-1}L_{1}D_{1}R_{1}P_{1}^{T},
+  = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger},
 \end{align*}
 ```
 where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
@@ -128,21 +130,15 @@ function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
     ldiv!(R₀, G) # R₀⁻¹⋅Dmax⁻¹
     mul_P!(M, p₀, G) # P₀⋅R₀⁻¹⋅Dmax⁻¹
 
-    # calculate LDR decomposition of L⋅D⋅R⋅Pᵀ = [P₀⋅R₀⁻¹⋅Dmax⁻¹ + L₀⋅Dmin]
+    # calculate LDR factorization of L⋅D⋅R⋅Pᵀ = [P₀⋅R₀⁻¹⋅Dmax⁻¹ + L₀⋅Dmin]
     @. F′.L = F′.L + M
     ldr!(F′)
 
-    # invert the LDR decomposition, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
+    # invert the LDR factorization, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
     inv!(G, F′)
 
-    # Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
-    div_D!(F′.L, d_max, G)
-
-    # calculate LDR of Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
-    ldr!(F′)
-
-    # G = P₀⋅R₀⁻¹⋅F
-    copyto!(M, F′)
+    # P₀⋅R₀⁻¹⋅Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
+    div_D!(M, d_max, G)
     ldiv!(R₀, M)
     mul_P!(G, p₀, M)
 
@@ -153,6 +149,7 @@ end
 @doc raw"""
     inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
              F::LDR{T}=ldr(Fᵥ)) where {T}
+    
     inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
              F::LDR{T}=ldr(Fᵤ),
              dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -180,8 +177,9 @@ G = & \left(U+V\right)^{-1}\\
   = & \left(L_{u}D_{u,\max}\left[D_{u,\min}R_{u}P_{u}^{T}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min}\right]D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
   = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{D_{u,\min}R_{u}P_{u}^{T}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min}}})^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}\\
   = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\left(L_{0}D_{0}R_{0}P_{0}^{T}\right)^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}\overset{L_{1}D_{1}R_{1}P_{1}^{T}}{\overbrace{D_{v,\max}^{-1}P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}D_{u,\max}^{-1}}}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}L_{1}D_{1}R_{1}P_{1}^{T}L_{u}^{\dagger},
+  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\overset{M}{\overbrace{P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}}}D_{u,\max}^{-1}L_{u}^{\dagger}\\
+  = & P_{v}R_{v}^{-1}\overset{M'}{\overbrace{D_{v,\max}^{-1}MD_{u,\max}^{-1}}}L_{u}^{\dagger}\\
+  = & P_{v}R_{v}^{-1}M'L_{u}^{\dagger},
 \end{align*}
 ```
 where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
@@ -248,23 +246,20 @@ function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     # calculate [L₀⋅D₀⋅R₀]⋅P₀ᵀ = [Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋]
     ldr!(F)
 
-    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
+    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹ = P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ
     inv!(M′, F, M=M″, p=p′)
 
-    # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
+    # calculate Dᵥ₊⁻¹⋅[P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ]⋅Dᵤ₊⁻¹
     @fastmath @inbounds for i in eachindex(dᵤ_max)
         for j in eachindex(dᵥ_max)
-            F.L[j,i] = M′[j,i] / dᵤ_max[i] / dᵥ_max[j]
+            G[j,i] = M′[j,i] / dᵤ_max[i] / dᵥ_max[j]
         end
     end
 
-    # calculate [L₁⋅D₁⋅R₁]⋅P₁ᵀ = Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₊⁻¹
-    ldr!(F)
-
-    # calculate Pᵥ⋅Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Lᵤᵀ
-    mul!(M′, F, Lᵤᵀ) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Lᵤᵀ
-    ldiv!(Rᵥ, M′) # Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Lᵤᵀ
-    mul_P!(G, pᵥ, M′) # G = Pᵥ⋅Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Lᵤᵀ
+    # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
+    mul!(M′, G, Lᵤᵀ) # [Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
+    ldiv!(Rᵥ, M′) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
+    mul_P!(G, pᵥ, M′) # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
 
     return nothing
 end
@@ -273,6 +268,7 @@ end
 @doc raw"""
     inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
                 F::LDR{T}=ldr(F)) where {T}
+    
     inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
                 F::LDR{T}=ldr(Fᵤ),
                 dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
@@ -300,8 +296,9 @@ G = & \left(U^{-1}+V\right)^{-1}\\
   = & \left(P_{u}R_{u}^{-1}D_{u,\min}^{-1}\left[D_{u,\max}^{-1}L_{u}^{\dagger}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}P_{u}^{T}L_{v}D_{v,\min}\right]D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
   = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{D_{u,\max}^{-1}L_{u}^{\dagger}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}P_{u}^{T}L_{v}D_{v,\min}}})^{-1}D_{u,\min}R_{u}P_{u}^{T}\\
   = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\left(L_{0}D_{0}R_{0}P_{0}^{T}\right)^{-1}D_{u,\min}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}\overset{L_{1}D_{1}R_{1}P_{1}^{T}}{\overbrace{D_{v,\max}^{-1}P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}D_{u,\min}}}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}L_{1}D_{1}R_{1}P_{1}^{T}R_{u}P_{u}^{T},
+  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\overset{M}{\overbrace{P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}}}D_{u,\min}R_{u}P_{u}^{T}\\
+  = & P_{v}R_{v}^{-1}\overset{M'}{\overbrace{D_{v,\max}^{-1}MD_{u,\min}}}R_{u}P_{u}^{T}\\
+  = & P_{v}R_{v}^{-1}M'R_{u}P_{u}^{T},
 \end{align*}
 ```
 where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
@@ -368,33 +365,32 @@ function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
     # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ] = [Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Lᵥ⋅Dᵥ₋]
     ldr!(F)
 
-    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅
+    # calculate P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ = [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
     inv!(M, F, M=M′, p=p′)
 
-    # calculate Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
+    # calculate Dᵥ₊⁻¹⋅[P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ]⋅Dᵤ₋
     @fastmath @inbounds for i in eachindex(dᵤ_min)
         for j in eachindex(dᵥ_max)
-            F.L[j,i] = M[j,i] * dᵤ_min[i] / dᵥ_max[j]
+            G[j,i] = M[j,i] * dᵤ_min[i] / dᵥ_max[j]
         end
     end
 
-    # calculate [L₁⋅D₁⋅R₁⋅P₁ᵀ] = Dᵥ₊⁻¹⋅[L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹⋅Dᵤ₋
-    ldr!(F)
-
-    # calculate Pᵥ⋅Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
-    copyto!(G, F) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]
-    rmul!(G, Rᵤ) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ
-    mul_P!(M, G, Fᵤ.pᵀ) # [L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
-    ldiv!(Rᵥ, M) # Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
-    mul_P!(G, pᵥ, M) # G = Pᵥ⋅Rᵥ⁻¹⋅[L₁⋅D₁⋅R₁⋅P₁ᵀ]⋅Rᵤ⋅Pᵤᵀ
+    # calculate Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
+    rmul!(G, Rᵤ) # [Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ
+    ldiv!(Rᵥ, G) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ
+    mul_P!(M, G, Fᵤ.pᵀ) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
+    mul_P!(G, pᵥ, M) # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
 
     return nothing
 end
 
 
+
 @doc raw"""
     sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+
     sign_det(F::LDR{T}) where {T<:Real}
+
     sign_det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
 
 Returns the sign/phase factor of the determinant for a matrix ``A`` represented by the
@@ -488,6 +484,7 @@ end
 @doc raw"""
     abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T};
                   as_log::Bool=false) where {T}
+                  
     abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
                   as_log::Bool=false,
                   p::AbstractVector{Int}=similar(F₁.pᵀ),

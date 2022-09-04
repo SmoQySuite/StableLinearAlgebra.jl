@@ -19,7 +19,8 @@ makedocs(
     ),
     pages=[
         "Home" => "index.md",
-        "API" => "api.md"
+        "Public API" => "public_api.md",
+        "Developer API" => "developer_api.md"
     ],
 )
 

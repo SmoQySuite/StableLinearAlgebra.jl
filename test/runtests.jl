@@ -42,8 +42,8 @@ end
     # system parameters
     N     = 12 # system size
     t     = 1.0 # nearest neighbor hopping
-    μ     = 0.5 # chemical potential
-    β     = 20.0 # inverse temperature
+    μ     = 0.0 # chemical potential
+    β     = 40.0 # inverse temperature
     Δτ    = 0.1 # discretization in imaginary time
     L     = round(Int,β/Δτ) # length of imaginary time axis
     nstab = 10 # stabalization frequency
@@ -107,6 +107,38 @@ end
     ldr!(F, I)
     copyto!(A, F, ws)
     @test A ≈ I
+
+    # test ldiv!
+    F = ldr(B̄)
+    C = similar(A)
+    copyto!(A, I)
+    ldiv!(C, F, A, ws)
+    @test (C * B̄) ≈ I
+
+    # test ldiv!
+    F = ldr(B̄)
+    F′ = ldr(F)
+    F″ = ldr(F)
+    copyto!(F′, I)
+    ldiv!(F″, F, F′, ws)
+    copyto!(A, F″)
+    @test (A * B̄) ≈ I
+
+    # test rdiv!
+    F = ldr(B̄)
+    C = similar(A)
+    copyto!(A, I)
+    rdiv!(C, A, F, ws)
+    @test (C * B̄) ≈ I
+
+    # test rdiv!
+    F = ldr(B̄)
+    F′ = ldr(F)
+    F″ = ldr(F)
+    copyto!(F′, I)
+    rdiv!(F″, F′, F, ws)
+    copyto!(A, F″)
+    @test (A * B̄) ≈ I
 
     # testing lmul!(::AbstractMatrix, ::LDR) and inv_IpA!
     F′ = ldr(F)

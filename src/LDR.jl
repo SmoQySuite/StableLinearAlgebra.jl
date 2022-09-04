@@ -250,7 +250,9 @@ end
 @doc raw"""
 
     ldr_workspace(A::AbstractMatrix)
+
     ldr_workspace(F::LDR)
+    
     ldr_workspace(Fs::Vector{LDR})
 
 Return a [`LDRWorkspace`](@ref) that can be used to avoid dynamic memory allocations.
