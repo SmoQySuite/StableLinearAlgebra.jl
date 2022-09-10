@@ -416,7 +416,7 @@ function sign_det(F::LDR{T}) where {T<:Real}
     # account for sign of L
     sgn = -sgn
     # multiply by det(Pᵀ) <==> sign/parity of pᵀ
-    sgn = sgn * sign_P(F.pᵀ)
+    sgn = sgn * perm_sign(F.pᵀ)
     # normalize
     sgn = sgn/abs(sgn)
 
@@ -441,7 +441,7 @@ function sign_det(F::LDR{T};
     copyto!(M,F.L)
     sgn = sgn * det(LinearAlgebra.lu!(M))
     # multiply by det(Pᵀ) <==> sign/parity of pᵀ
-    sgn = sgn * sign_P(F.pᵀ)
+    sgn = sgn * perm_sign(F.pᵀ)
     # normalize
     sgn = sgn/abs(sgn)
 

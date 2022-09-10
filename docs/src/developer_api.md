@@ -9,5 +9,5 @@ StableLinearAlgebra.ldiv_D!
 StableLinearAlgebra.rdiv_D!
 StableLinearAlgebra.mul_P!
 StableLinearAlgebra.inv_P!
-StableLinearAlgebra.sign_P
+StableLinearAlgebra.perm_sign
 ```

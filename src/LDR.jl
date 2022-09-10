@@ -234,8 +234,8 @@ end
 @doc raw"""
     ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
 
-Update the vector `Fs` of [`LDR`](@ref) factorization based on the sequence of matrices
-contained in `A`.
+Update the vector `Fs` of [`LDR`](@ref) factorizations based on the sequence of matrices
+contained in `A`, such that `Fs[i]` is the [`LDR`](@ref) factorization for the matrix `A[:,:,i]`.
 """
 function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
     
@@ -248,7 +248,6 @@ function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
 end
 
 @doc raw"""
-
     ldr_workspace(A::AbstractMatrix)
 
     ldr_workspace(F::LDR)

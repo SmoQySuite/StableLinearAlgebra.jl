@@ -186,9 +186,9 @@ end
 @doc raw"""
     perm_sign(p::AbstractVector{Int})
 
-Calculate the sign/parity of the permutation, ``\textrm{sgn}(p) = \pm 1.``
+Calculate the sign/parity of the permutation `p`, ``\textrm{sgn}(p) = \pm 1.``
 """
-function sign_P(p::AbstractVector{Int})
+function perm_sign(p::AbstractVector{Int})
    
     N = length(p)
     sgn = 0
