@@ -21,7 +21,7 @@ size(F::LDR, dims) = size(F.L, dims)
     copyto!(A::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
     copyto!(A::AbstractMatrix{T}, F::LDR{T};
-            M{T}::AbstractMatrix=similar(A)) where {T}
+            M::AbstractMatrix{T}=similar(A)) where {T}
 
 Copy the matrix represented by the [`LDR`](@ref) factorization `F` into the matrix `A`.
 """
@@ -51,10 +51,12 @@ end
 @doc raw"""
     copyto!(F::LDR{T}, A::AbstractMatrix{T}) where {T}
 
+    copyto!(F::LDR, I::UniformScaling)
+
 Copy the matrix `A` to the [`LDR`](@ref) factorization `F`, calculating the
 [`LDR`](@ref) factorization to represent `A`.
 """
-copyto!(F::LDR, A::AbstractMatrix) = ldr!(F,A)
+copyto!(F::LDR{T}, A::AbstractMatrix{T}) where {T} = ldr!(F,A)
 copyto!(F::LDR, I::UniformScaling) = ldr!(F,I)
 
 
@@ -427,7 +429,7 @@ function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
     ldr!(F′)
 
     # calculate R′ = R′⋅P′ᵀ⋅R
-    mul_P!(M, p′ᵀ, R′) # (R′⋅P′ᵀ)
+    mul_P!(M, F′.R, F′.pᵀ) # (R′⋅P′ᵀ)
     mul!(F′.R, M, R) # (R′⋅P′ᵀ)⋅R
 
     # set P′ᵀ = Pᵀ (P′ = P)

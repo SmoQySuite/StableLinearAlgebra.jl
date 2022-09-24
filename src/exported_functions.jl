@@ -74,7 +74,9 @@ end
              d_min::AbstractVector{T}=similar(F.d),
              d_max::AbstractVector{T}=similar(F.d),
              M::AbstractMatrix{T}=similar(F.L),
-             p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+             M′::AbstractMatrix{T}=similar(F.L),
+             p::AbstractVector{Int}=similar(F.pᵀ),
+             p′::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
 Given a matrix ``A`` represented by the [`LDR`](@ref) factorization `F`, calculate the numerically stabalized inverse
 ```math
@@ -101,7 +103,7 @@ where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
 function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
                   F′::LDR{T}=ldr(F)) where {T}
 
-    inv_IpA!(G, F, F′=F′, d_min=ws.v, d_max=ws.v′, M=ws.M, p=ws.p)
+    inv_IpA!(G, F, F′=F′, d_min=ws.v, d_max=ws.v′, M=ws.M, M′=ws.M′, p=ws.p, p′=ws.p′)
     return nothing
 end
 
@@ -110,7 +112,9 @@ function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
                   d_min::AbstractVector{T}=similar(F.d),
                   d_max::AbstractVector{T}=similar(F.d),
                   M::AbstractMatrix{T}=similar(F.L),
-                  p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+                  M′::AbstractMatrix{T}=similar(F.L),
+                  p::AbstractVector{Int}=similar(F.pᵀ),
+                  p′::AbstractVector{Int}=similar(F.pᵀ)) where {T}
 
     # construct Dmin = min(D,1) and Dmax⁻¹ = [max(D,1)]⁻¹ matrices
     @. d_min = min(F.d, 1)
@@ -135,7 +139,7 @@ function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
     ldr!(F′)
 
     # invert the LDR factorization, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
-    inv!(G, F′)
+    inv!(G, F′, M=M′, p=p′)
 
     # P₀⋅R₀⁻¹⋅Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
     div_D!(M, d_max, G)
