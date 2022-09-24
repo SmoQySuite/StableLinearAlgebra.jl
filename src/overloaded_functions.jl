@@ -177,7 +177,7 @@ function lmul!(F₂::LDR{T}, F₁::LDR{T};
 
     # store R₁ and P₁ᵀ
     copyto!(M, F₁.R)
-    R₁ = UpperTriangular(M)
+    R₁ = M
     copyto!(p, F₁.pᵀ)
     p₁ᵀ = p
 
@@ -430,7 +430,7 @@ function mul!(F′::LDR{T}, B::AbstractMatrix{T}, F::LDR{T};
 
     # calculate R′ = R′⋅P′ᵀ⋅R
     mul_P!(M, F′.R, F′.pᵀ) # (R′⋅P′ᵀ)
-    mul!(F′.R, M, R) # (R′⋅P′ᵀ)⋅R
+    mul!(F′.R, M, F.R) # (R′⋅P′ᵀ)⋅R
 
     # set P′ᵀ = Pᵀ (P′ = P)
     copyto!(p′ᵀ, pᵀ)
