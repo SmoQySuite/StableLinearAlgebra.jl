@@ -81,11 +81,11 @@ end
 
 
 @doc raw"""
-    ldr(A::AbstractMatrix)
+    ldr(A::AbstractMatrix; qr_workspace::QRPivotedWs=QRPivotedWs(A))
 
 Calculate and return the [`LDR`](@ref) decomposition for the matrix `A`.
 """
-function ldr(A::AbstractMatrix{T})::LDR{T} where {T}
+function ldr(A::AbstractMatrix{T}; qr_workspace::QRPivotedWs=QRPivotedWs(A))::LDR{T} where {T}
 
     # make sure A is a square matrix
     @assert size(A,1) == size(A,2)
@@ -105,11 +105,10 @@ function ldr(A::AbstractMatrix{T})::LDR{T} where {T}
 
     # allocate workspace for QR decomposition
     copyto!(L,A)
-    ws = QRPivotedWs(L)
-    pᵀ = ws.jpvt
+    pᵀ = similar(qr_workspace.jpvt)
 
     # instantiate LDR decomposition
-    F = LDR(L,d,R,pᵀ,ws)
+    F = LDR(L,d,R,pᵀ,qr_workspace)
 
     # calculate LDR decomposition
     ldr!(F, A)
@@ -119,20 +118,26 @@ end
 
 
 @doc raw"""
-    ldr(F::LDR)
+    ldr(F::LDR; reuse_qr_workspace::Bool=false)
 
-Return a new [`LDR`](@ref) factorization that is a copy of `F`.
+Return a new [`LDR`](@ref) factorization that is a copy of `F`. If `reuse_qr_workspace = true`,
+then the `F.ws::QRPivotedWs` instance is re-used in the new [`LDR`](@ref) factorization that is returned
+so as to avoid allocating a new instance of `QRPivotedWs`.
 """
-function ldr(F::LDR)
+function ldr(F::LDR; reuse_qr_workspace::Bool=false)
 
-    F′ = ldr(F.L)
+    if reuse_qr_workspace
+        F′ = ldr(F.L, qr_workspace = F.ws)
+    else
+        F′ = ldr(F.L)
+    end
     copyto!(F′, F)
 
     return F′
 end
 
 
-@doc raw"""
+@doc raw"""``
     ldr!(F::LDR, A::AbstractMatrix)
 
 Calculate the [`LDR`](@ref) decomposition `F` for the matrix `A`.
@@ -156,10 +161,13 @@ of the matrix `F.L`.
 """
 function ldr!(F::LDR)
 
-    (; L, d, R, ws) = F
+    (; L, d, R, pᵀ, ws) = F
 
     # calclate QR decomposition
     LAPACK.geqp3!(ws, L)
+
+    # record permutation matrix
+    copyto!(pᵀ, ws.jpvt)
 
     # extract upper triangular matrix R
     R′ = UpperTriangular(L)
@@ -198,33 +206,48 @@ end
 
 
 @doc raw"""
-    ldrs(A::AbstractMatrix{T}, N::Int) where {T}
+    ldrs(A::AbstractMatrix{T}, N::Int; reuse_qr_workspace::Bool=false) where {T}
 
 Return a vector of `N` [`LDR`](@ref) factorizations, where each one represent the matrix `A`.
+If `reuse_qr_workspace = true`, then the same `QRPivotedWs` instance is used in all [`LDR`](@ref)
+instances to save memory.
 """
-function ldrs(A::AbstractMatrix{T}, N::Int) where {T}
+function ldrs(A::AbstractMatrix{T}, N::Int; reuse_qr_workspace::Bool=false) where {T}
     
     Fs = Vector{LDR{T}}(undef,0)
-    for i in 1:N
-        push!(Fs, ldr(A))
+    F1 = ldr(A)
+    push!(Fs, F1)
+    for i in 2:N
+        if reuse_qr_workspace
+            push!(Fs, ldr(A, F1.ws))
+        else
+            push!(Fs, ldr(A))
+        end
     end
     return Fs
 end
 
 
 @doc raw"""
-    ldrs(A::AbstractArray{T,3}) where {T}
+    ldrs(A::AbstractArray{T,3}; reuse_qr_workspace::Bool=false) where {T}
 
 Return a vector of [`LDR`](@ref) factorizations of length `size(A, 3)`, where there is an
-[`LDR`](@ref) factorization for each matrix `A[:,:,i]`.
+[`LDR`](@ref) factorization for each matrix `A[:,:,i]`. If `reuse_qr_workspace = true`,
+then the same `QRPivotedWs` instance is used in all [`LDR`](@ref) instances to save memory.
 """
-function ldrs(A::AbstractArray{T,3}) where {T}
+function ldrs(A::AbstractArray{T,3}; reuse_qr_workspace::Bool=false) where {T}
     
     Fs = Vector{LDR{T}}(undef,0)
     N  = size(A,3)
-    for i in 1:N
+    A₁ = @view A[:,:,1]
+    F₁ = ldr(A₁)
+    for i in 2:N
         Aᵢ = @view A[:,:,i]
-        push!(Fs, ldr(Aᵢ))
+        if reuse_qr_workspace
+            push!(Fs, ldr(Aᵢ, F₁.ws))
+        else
+            push!(Fs, ldr(Aᵢ))
+        end
     end
     
     return Fs

@@ -6,7 +6,7 @@ represented by the vector `d`.
 """
 function mul_D!(A::AbstractMatrix, d::AbstractVector, B::AbstractMatrix)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             A[r,c] = d[r] * B[r,c]
         end
@@ -24,7 +24,7 @@ represented by the vector `d`.
 """
 function mul_D!(A::AbstractMatrix, B::AbstractMatrix, d::AbstractVector)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             A[r,c] = B[r,c] * d[c]
         end
@@ -42,7 +42,7 @@ represented by the vector `d`.
 """
 function div_D!(A::AbstractMatrix, d::AbstractVector, B::AbstractMatrix)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             A[r,c] = B[r,c] / d[r]
         end
@@ -60,7 +60,7 @@ represented by the vector `d`.
 """
 function div_D!(A::AbstractMatrix, B::AbstractMatrix, d::AbstractVector)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             A[r,c] = B[r,c] / d[c]
         end
@@ -78,7 +78,7 @@ matrix represented by the vector `d`.
 """
 function lmul_D!(d::AbstractVector, M::AbstractMatrix)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             M[r,c] *= d[r]
         end
@@ -96,7 +96,7 @@ matrix represented by the vector `d`.
 """
 function rmul_D!(M::AbstractMatrix, d::AbstractVector)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             M[r,c] *= d[c]
         end
@@ -114,7 +114,7 @@ matrix represented by the vector `d`.
 """
 function ldiv_D!(d::AbstractVector, M::AbstractMatrix)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             M[r,c] /= d[r]
         end
@@ -132,7 +132,7 @@ matrix represented by the vector `d`.
 """
 function rdiv_D!(M::AbstractMatrix, d::AbstractVector)
 
-    @inbounds @simd for c in eachindex(d)
+    @inbounds @fastmath for c in eachindex(d)
         for r in eachindex(d)
             M[r,c] /= d[c]
         end
