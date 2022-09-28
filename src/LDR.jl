@@ -219,7 +219,7 @@ function ldrs(A::AbstractMatrix{T}, N::Int; reuse_qr_workspace::Bool=false) wher
     push!(Fs, F1)
     for i in 2:N
         if reuse_qr_workspace
-            push!(Fs, ldr(A, F1.ws))
+            push!(Fs, ldr(A, qr_workspace = F1.ws))
         else
             push!(Fs, ldr(A))
         end
@@ -244,7 +244,7 @@ function ldrs(A::AbstractArray{T,3}; reuse_qr_workspace::Bool=false) where {T}
     for i in 2:N
         Aᵢ = @view A[:,:,i]
         if reuse_qr_workspace
-            push!(Fs, ldr(Aᵢ, F₁.ws))
+            push!(Fs, ldr(Aᵢ, qr_workspace = F₁.ws))
         else
             push!(Fs, ldr(Aᵢ))
         end
