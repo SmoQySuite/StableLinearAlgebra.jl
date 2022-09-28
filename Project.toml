@@ -1,7 +1,7 @@
 name = "StableLinearAlgebra"
 uuid = "7d06c537-f8ff-4c22-91e1-ce4088e3cfd7"
 authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>"]
-version = "1.2.4"
+version = "1.2.5"
 
 [deps]
 FastLapackInterface = "29a986be-02c6-4525-aec4-84b980013641"
@@ -9,7 +9,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [compat]
 julia = "1.7"
-FastLapackInterface = "1.2.8"
+FastLapackInterface = "1.2.7"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
