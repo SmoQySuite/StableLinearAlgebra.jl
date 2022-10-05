@@ -1,552 +1,399 @@
-@doc raw"""
-    inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+# @doc raw"""
+#     adjoint_inv_ldr!(A⁻ᵀ::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 
-    inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
-         M::AbstractMatrix{T}=similar(F.L),
-         p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+# Given a matrix ``A,`` calculate the [`LDR`](@ref) factorization ``(A^{-1})^{\dagger},``
+# storing the result in `A⁻ᵀ`.
 
-Calculate the inverse of a matrix ``A`` represented of the [`LDR`](@ref) facorization `F`,
-writing the inverse matrix `A⁻¹`.
-"""
-function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T}) where {T}
+# # Algorithm
 
-    inv!(A⁻¹, F, M=ws.M, p=ws.p)
-    return nothing
-end
+# By calculating the pivoted QR factorization of `A`, we can calculate the [`LDR`](@ref)
+# facorization `(A^{-1})^{\dagger} = L_0 D_0 R_0` using the procedure
 
-function inv!(A⁻¹::AbstractMatrix{T}, F::LDR{T};
-              M::AbstractMatrix{T}=similar(F.L),
-              p::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+# ```math
+# \begin{align*}
+# (A^{-1})^{\dagger}:= & ([QRP^{T}]^{-1})^{\dagger}\\
+# = & ([Q\,\textrm{|diag}(R)|\,|\textrm{diag}(R)|^{-1}\,RP^{T}]^{-1})^{\dagger}\\
+# = & [\overset{R_{0}^{\dagger}}{\overbrace{PR^{-1}|\textrm{diag}(R)}|}\,\overset{D_{0}}{\overbrace{|\textrm{diag}(R)|^{-1}}}\,\overset{L_{0}^{\dagger}}{\overbrace{Q^{\dagger}}}]^{\dagger}\\
+# = & [R_{0}^{\dagger}D_{0}L_{0}^{\dagger}]^{\dagger}\\
+# = & L_{0}D_{0}R_{0}.
+# \end{align*}
+# ```
+# """
+# function adjoint_inv_ldr!(A⁻ᵀ::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 
-    # calculate inverse A⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
-    L   = F.L
-    d   = F.d
-    R   = UpperTriangular(F.R)
-    inv_P!(p, F.pᵀ)
-    adjoint!(M, L) # A⁻¹ = Lᵀ
-    ldiv_D!(d, M) # A⁻¹ = D⁻¹⋅Lᵀ
-    ldiv!(R, M) # A⁻¹ = R⁻¹⋅D⁻¹⋅Lᵀ
-    mul_P!(A⁻¹, p, M) # A⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
+#     # calculate A = Q⋅R⋅Pᵀ
+#     copyto!(A⁻ᵀ.L, A)
+#     LAPACK.geqp3!(A⁻ᵀ.L, ws.qr_ws)
+#     copyto!(A⁻ᵀ.R, A⁻ᵀ.L)
+#     triu!(A⁻ᵀ.R) # R (set lower triangular to 0)
+#     pᵀ = ws.qr_ws.jpvt
+#     p  = ws.lu_ws.ipiv
+#     inv_P!(p, pᵀ) # P
+#     LAPACK.orgqr!(Aᵀ.L, ws.qr_ws) # L₀ = Q
+#     @fastmath @inbounds for i in eachindex(A⁻ᵀ.d)
+#         A⁻ᵀ.d[i] = inv(abs(A⁻ᵀ.R[i,i])) # D₀ = |diag(R)|⁻¹
+#     end
+#     R′ = A⁻ᵀ.R
+#     lmul_D!(A⁻ᵀ.d, R′) # R′ := |diag(R)|⁻¹⋅R
+#     R″ = R′
+#     LinearAlgebra.inv!(UpperTriangular(R″)) # R″ = (R′)⁻¹ = R⁻¹⋅|diag(R)|
+#     R₀ᵀ = ws.M
+#     mul_P!(R₀ᵀ, p, R″) # R₀ᵀ = P⋅R″ = P⋅R⁻¹⋅diag(R)
+#     adjoint(A⁻ᵀ.R, R₀ᵀ) # R₀ = [P⋅R⁻¹⋅diag(R)]ᵀ
 
-    return nothing
-end
-
-
-@doc raw"""
-    inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
-
-    inv!(F::LDR{T};
-         M::AbstractMatrix{T},
-         p::AbstractVector{Int}) where {T}
-
-Invert the [`LDR`](@ref) factorization `F` in-place.
-"""
-function inv!(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
-
-    inv!(F, M=ws.M, p=ws.p)
-    return nothing
-end
-
-function inv!(F::LDR{T};
-              M::AbstractMatrix{T},
-              p::AbstractVector{Int}) where {T}
-
-    # given F = [L⋅D⋅R⋅Pᵀ], calculate F⁻¹ = [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ in-place
-    Lᵀ = M
-    adjoint!(Lᵀ, F.L)
-    ldiv_D!(F.d, Lᵀ) # D⁻¹⋅Lᵀ
-    R = UpperTriangular(F.R)
-    ldiv!(R, Lᵀ) # R⁻¹⋅D⁻¹⋅Lᵀ
-    inv_P!(p, F.pᵀ)
-    mul_P!(F.L, p, Lᵀ) # P⋅R⁻¹⋅D⁻¹⋅Lᵀ
-    ldr!(F)
-
-    return nothing
-end
+#     return nothing
+# end
 
 
 @doc raw"""
-    inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
-             F′::LDR{T}=ldr(F)) where {T}
-    
-    inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
-             F′::LDR{T}=ldr(F),
-             d_min::AbstractVector{T}=similar(F.d),
-             d_max::AbstractVector{T}=similar(F.d),
-             M::AbstractMatrix{T}=similar(F.L),
-             M′::AbstractMatrix{T}=similar(F.L),
-             p::AbstractVector{Int}=similar(F.pᵀ),
-             p′::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+    inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Given a matrix ``A`` represented by the [`LDR`](@ref) factorization `F`, calculate the numerically stabalized inverse
-```math
-G = (I + A)^{-1},
-```
-storing the result in the matrix `G`.
+Calculate the numerically stable inverse ``G := [I + A]^{-1},`` where ``G`` is a matrix,
+and ``A`` is represented by a [`LDR`](@ref) factorization. This method also returns
+``\textrm{sign}(\det G)`` and ``\log( \vert \det G\ver ).``
 
 # Algorithm
 
-Given an [`LDR`](@ref) factorization of ``A``, calculate ``G = (I + A)^{-1}`` using the procedure
+The numerically stable inverse ``G := [I + A]^{-1}`` is calculated using the procedure
 ```math
 \begin{align*}
-G = & \left(I+A\right)^{-1}\\
-  = & (I+\overset{D_{a,\min}D_{a,\max}}{L_{a}\overbrace{D_{a}}R_{a}}P_{a}^{T})^{-1}\\
-  = & \left(I+L_{a}D_{a,\min}D_{a,\max}R_{a}P_{a}^{T}\right)^{-1}\\
-  = & \left(\left[P_{a}R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min}\right]D_{a,\max}R_{a}P_{a}^{T}\right)^{-1}\\
-  = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{P_{a}R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min}}})^{-1}\\
-  = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}(L_{0}D_{0}R_{0}P_{0}^{T})^{-1}\\
-  = & P_{a}R_{a}^{-1}D_{a,\max}^{-1}P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger},
+G:= & [I+A]^{-1}\\
+= & [I+L_{a}D_{a}R_{a}]^{-1}\\
+= & [I+L_{a}D_{a,\min}D_{a,\max}R_{a}]^{-1}\\
+= & [(R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min})D_{a,\max}R_{a}]^{-1}\\
+= & R_{a}^{-1}D_{a,\max}^{-1}[\overset{M}{\overbrace{R_{a}^{-1}D_{a,\max}^{-1}+L_{a}D_{a,\min}}}]^{-1}\\
+= & R_{a}^{-1}D_{a,\max}^{-1}M^{-1},
 \end{align*}
 ```
-where ``D_{\min} = \min(D, 1)`` and ``D_{\max} = \max(D, 1).``
+where ``D_{a,\min} = \min(D_a, 1)`` and ``D_{a,\max} = \max(D_a, 1).``
+Intermediate matrix inversions and relevant determinant calculations are performed
+via LU factorizations with partial pivoting.
 """
-function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T}, ws::LDRWorkspace{T};
-                  F′::LDR{T}=ldr(F)) where {T}
+function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-    inv_IpA!(G, F, F′=F′, d_min=ws.v, d_max=ws.v′, M=ws.M, M′=ws.M′, p=ws.p, p′=ws.p′)
-    return nothing
-end
+    Lₐ = A.L
+    dₐ = A.d
+    Rₐ = A.R
 
-function inv_IpA!(G::AbstractMatrix{T}, F::LDR{T};
-                  F′::LDR{T}=ldr(F),
-                  d_min::AbstractVector{T}=similar(F.d),
-                  d_max::AbstractVector{T}=similar(F.d),
-                  M::AbstractMatrix{T}=similar(F.L),
-                  M′::AbstractMatrix{T}=similar(F.L),
-                  p::AbstractVector{Int}=similar(F.pᵀ),
-                  p′::AbstractVector{Int}=similar(F.pᵀ)) where {T}
+    # calculate Rₐ⁻¹
+    Rₐ⁻¹ = ws.M′
+    copyto!(Rₐ⁻¹, Rₐ)
+    logdetRₐ⁻¹, sgndetRₐ⁻¹ = inv_lu!(Rₐ⁻¹, ws.lu_ws)
 
-    # construct Dmin = min(D,1) and Dmax⁻¹ = [max(D,1)]⁻¹ matrices
-    @. d_min = min(F.d, 1)
-    @. d_max = max(F.d, 1)
+    # calculate D₋ = min(Dₐ, 1)
+    d₋ = ws.v
+    @. d₋ = min(dₐ, 1)
 
-    # define the original P₀, R₀⁻¹
-    p₀ = p
-    inv_P!(p₀, F.pᵀ)
-    R₀ = UpperTriangular(F.R)
+    # calculate Lₐ⋅D₋
+    mul_D!(ws.M, Lₐ, d₋)
 
-    # caclulate L₀⋅Dmin
-    mul_D!(F′.L, F.L, d_min)
+    # calculate D₊ = max(Dₐ, 1)
+    d₊ = ws.v
+    @. d₊ = max(dₐ, 1)
 
-    # calculate P₀⋅R₀⁻¹⋅Dmax⁻¹
-    copyto!(G, I)
-    ldiv_D!(d_max, G) # Dmax⁻¹
-    ldiv!(R₀, G) # R₀⁻¹⋅Dmax⁻¹
-    mul_P!(M, p₀, G) # P₀⋅R₀⁻¹⋅Dmax⁻¹
+    # calculate sign(det(D₊)) and log(|det(D₊)|)
+    logdetD₊, sgndetD₊ = det_D(d₊)
 
-    # calculate LDR factorization of L⋅D⋅R⋅Pᵀ = [P₀⋅R₀⁻¹⋅Dmax⁻¹ + L₀⋅Dmin]
-    @. F′.L = F′.L + M
-    ldr!(F′)
+    # calculate Rₐ⁻¹⋅D₊⁻¹
+    Rₐ⁻¹D₊ = Rₐ⁻¹
+    rdiv_D!(Rₐ⁻¹D₊, d₊)
 
-    # invert the LDR factorization, [L⋅D⋅R⋅Pᵀ]⁻¹ = P⋅R⁻¹⋅D⁻¹⋅Lᵀ
-    inv!(G, F′, M=M′, p=p′)
+    # calculate M = Rₐ⁻¹⋅D₊⁻¹ + Lₐ⋅D₋
+    @. ws.M += Rₐ⁻¹D₊
 
-    # P₀⋅R₀⁻¹⋅Dmax⁻¹⋅[P⋅R⁻¹⋅D⁻¹⋅Lᵀ]
-    div_D!(M, d_max, G)
-    ldiv!(R₀, M)
-    mul_P!(G, p₀, M)
+    # calculate M⁻¹ = [Rₐ⁻¹⋅D₊⁻¹ + Lₐ⋅D₋]⁻¹
+    M⁻¹ = ws.M
+    logdetM⁻¹, sgndetM⁻¹ = inv_lu!(M⁻¹, ws.lu_ws)
 
-    return nothing
+    # calculate G = Rₐ⁻¹⋅D₊⁻¹⋅M⁻¹
+    mul!(G, Rₐ⁻¹D₊, M⁻¹)
+
+    # calculate sign(det(G)) and log(|det(G)|)
+    sgndetG = sgndetRₐ⁻¹ * conj(sgndetD₊) * sgndetM⁻¹
+    logdetG = logdetRₐ⁻¹ -      logdetD₊  + logdetM⁻¹
+
+    return logdetG, sgndetG
 end
 
 
 @doc raw"""
-    inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
-             F::LDR{T}=ldr(Fᵥ)) where {T}
-    
-    inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
-             F::LDR{T}=ldr(Fᵤ),
-             dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-             dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
-             dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-             dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
-             M::AbstractMatrix{T}=similar(Fᵥ.L),
-             M′::AbstractMatrix{T}=similar(Fᵥ.L),
-             M″::AbstractMatrix{T}=similar(Fᵥ.L),
-             p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
-             p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
+    inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the numerically stable inverse ``G = (U + V)^{-1},`` where the matrices ``U`` and
-``V`` are represented by the [`LDR`](@ref) factorizations `Fᵤ` and `Fᵥ` respectively.
+Calculate the numerically stable inverse ``G := [I + UV]^{-1},`` where ``G`` is a matrix and
+``U`` and ``V`` are represented by [`LDR`](@ref) factorizations.
 
 # Algorithm
 
-Letting ``U = [L_u D_u R_u] P_u^T`` and ``V = [L_v D_v R_v] P_v^T,`` the inverse matrix
-``G = (U + V)^{-1}`` is calculated using the procedure
+The numerically stable inverse ``G := [I + UV]^{-1}`` is calculated using the procedure
 ```math
 \begin{align*}
-G = & \left(U+V\right)^{-1}\\
-  = & \overset{D_{u,\max}D_{u,\min}}{(L_{u}\overbrace{D_{u}}R_{u}}P_{u}^{T}+\overset{D_{v,\min}D_{v,\max}}{L_{v}\overbrace{D_{v}}R_{v}}P_{v}^{T})^{-1}\\
-  = & \left(L_{u}D_{u,\max}D_{u,\min}R_{u}P_{u}^{T}+L_{v}D_{v,\min}D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
-  = & \left(L_{u}D_{u,\max}\left[D_{u,\min}R_{u}P_{u}^{T}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min}\right]D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{D_{u,\min}R_{u}P_{u}^{T}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min}}})^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\left(L_{0}D_{0}R_{0}P_{0}^{T}\right)^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\overset{M}{\overbrace{P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}}}D_{u,\max}^{-1}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}\overset{M'}{\overbrace{D_{v,\max}^{-1}MD_{u,\max}^{-1}}}L_{u}^{\dagger}\\
-  = & P_{v}R_{v}^{-1}M'L_{u}^{\dagger},
+G:= & [I+UV]^{-1}\\
+= & [I+L_{u}D_{u}R_{u}L_{v}D_{v}R_{v}]^{-1}\\
+= & R_{v}^{-1}[\overset{M}{\overbrace{L_{u}^{\dagger}R_{v}^{-1}+D_{u}R_{u}L_{v}D_{v}}}]^{-1}L_{u}^{\dagger}\\
+= & R_{v}^{-1}M^{-1}L_{u}^{\dagger}.
 \end{align*}
 ```
-where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
+Intermediate matrix inversions and relevant determinant calculations are performed
+via LU factorizations with partial pivoting.
 """
-function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
-                  F::LDR{T}=ldr(Fᵥ)) where {T}
+function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-    inv_UpV!(G, Fᵤ, Fᵥ, F=F, dᵤ_min=ws.v, dᵤ_max=ws.v′, dᵥ_min=ws.v″, dᵥ_max=ws.v‴,
-             M=ws.M, M′=ws.M′, M″=ws.M″, p=ws.p, p′=ws.p′)
-    return nothing
-end
+    Lᵤ = U.L
+    dᵤ = U.d
+    Rᵤ = V.R
+    Lᵥ = V.L
+    dᵥ = V.d
+    Rᵥ = V.R
 
-function inv_UpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
-                  F::LDR{T}=ldr(Fᵤ),
-                  dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-                  dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
-                  dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                  dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
-                  M::AbstractMatrix{T}=similar(Fᵥ.L),
-                  M′::AbstractMatrix{T}=similar(Fᵥ.L),
-                  M″::AbstractMatrix{T}=similar(Fᵥ.L),
-                  p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
-                  p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
+    # calculate sign(det(Lᵤ)) and log(det(Lᵤ))
+    copyto!(ws.M, Lᵤ)
+    logdetLᵤ, sgndetLᵤ = det_lu!(ws.M, ws.lu_ws)
 
-    # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
-    @. dᵤ_min = min(Fᵤ.d, 1)
-    @. dᵤ_max = max(Fᵤ.d, 1)
-    @. dᵥ_min = min(Fᵥ.d, 1)
-    @. dᵥ_max = max(Fᵥ.d, 1)
+    # calculate Rᵥ⁻¹, sign(det(Rᵥ⁻¹)) and log(det(Rᵥ⁻¹))
+    Rᵥ⁻¹ = ws.M′
+    copyto!(Rᵥ⁻¹, Rᵥ)
+    logdetRᵥ⁻¹, sgndetRᵥ⁻¹ = inv_lu!(Rᵥ⁻¹, ws.lu_ws)
 
-    # calculate Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-    pᵥ = p
-    Rᵥ = UpperTriangular(Fᵥ.R)
-    Rᵤ = UpperTriangular(Fᵤ.R)
-    inv_P!(pᵥ, Fᵥ.pᵀ)
-    copyto!(F.L, I) # I
-    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹
-    mul_P!(M, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
-    mul_P!(F.L, Fᵤ.pᵀ, M) # Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-    lmul!(Rᵤ, F.L) # Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
+    # represent Lᵤᵀ
+    Lᵤᵀ = adjoint(Lᵤ)
 
-    # calculate Dᵤ₋⋅[Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹]⋅Dᵥ₊⁻¹
-    @fastmath @inbounds for i in eachindex(dᵥ_max)
-        for j in eachindex(dᵤ_min)
-            F.L[j,i] *= dᵤ_min[j]/dᵥ_max[i]
-        end
-    end
+    # calculate Dᵤ⋅Rᵤ⋅Lᵥ⋅Dᵥ
+    mul!(ws.M, Rᵤ, Lᵥ) # Rᵤ⋅Lᵥ
+    lmul_D!(dᵤ, ws.M) # Dᵤ⋅[Rᵤ⋅Lᵥ]
+    rmul_D!(ws.M, dᵥ) # [Dᵤ⋅Rᵤ⋅Lᵥ]⋅Dᵥ
 
-    # calcualte Lᵤᵀ⋅Lᵥ
-    Lᵤᵀ = M
-    adjoint!(Lᵤᵀ, Fᵤ.L)
-    mul!(F.R, Lᵤᵀ, Fᵥ.L)
+    # calculate Lᵤᵀ⋅Rᵥ⁻¹
+    mul!(G, Lᵤᵀ, Rᵥ⁻¹)
 
-    # calculate Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Lᵥ]⋅Dᵥ₋
-    @fastmath @inbounds for i in eachindex(dᵥ_min)
-        for j in eachindex(dᵤ_max)
-            F.R[j,i] *= dᵥ_min[i]/dᵤ_max[j]
-        end
-    end
+    # calculate M = Lᵤᵀ⋅Rᵥ⁻¹ + Dᵤ⋅Rᵤ⋅Lᵥ⋅Dᵥ
+    @. G += ws.M
 
-    # calculate Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
-    @. F.L = F.L + F.R
+    # calculate M⁻¹ = [Lᵤᵀ⋅Rᵥ⁻¹ + Dᵤ⋅Rᵤ⋅Lᵥ⋅Dᵥ]⁻¹
+    M⁻¹ = G
+    logdetM⁻¹, sgndetM⁻¹ = inv_lu!(M⁻¹, ws.lu_ws)
 
-    # calculate [L₀⋅D₀⋅R₀]⋅P₀ᵀ = [Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋]
-    ldr!(F)
+    # calculate G := Rᵥ⁻¹⋅M⁻¹⋅Lᵤᵀ
+    mul!(ws.M, M⁻¹, Lᵤᵀ) # M⁻¹⋅Lᵤᵀ
+    mul!(G, Rᵥ⁻¹, ws.M) # G := Rᵥ⁻¹⋅[M⁻¹⋅Lᵤᵀ]
 
-    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹ = P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ
-    inv!(M′, F, M=M″, p=p′)
+    # calculate sign(det(G)) and log(|det(G)|)
+    sgndetG = sgndetRᵥ⁻¹ * sgndetM⁻¹ * conj(sgndetLᵤ)
+    logdetG = logdetRᵥ⁻¹ + logdetM⁻¹ -      logdetLᵤ
 
-    # calculate Dᵥ₊⁻¹⋅[P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ]⋅Dᵤ₊⁻¹
-    @fastmath @inbounds for i in eachindex(dᵤ_max)
-        for j in eachindex(dᵥ_max)
-            G[j,i] = M′[j,i] / dᵤ_max[i] / dᵥ_max[j]
-        end
-    end
-
-    # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
-    mul!(M′, G, Lᵤᵀ) # [Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
-    ldiv!(Rᵥ, M′) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
-    mul_P!(G, pᵥ, M′) # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₊⁻¹]⋅Lᵤᵀ
-
-    return nothing
+    return logdetG, sgndetG
 end
 
 
 @doc raw"""
-    inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
-                F::LDR{T}=ldr(F)) where {T}
-    
-    inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
-                F::LDR{T}=ldr(Fᵤ),
-                dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-                dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
-                dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
-                M::AbstractMatrix{T}=similar(Fᵥ.L),
-                M′::AbstractMatrix{T}=similar(Fᵥ.L),
-                p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
-                p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
+    inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the numerically stable inverse ``G = (U^{-1} + V)^{-1},`` where the matrices ``U`` and
-``V`` are represented by the [`LDR`](@ref) factorizations `Fᵤ` and `Fᵥ` respectively.
+Calculate the numerically stable inverse ``G := [U+V]^{-1},`` where ``G`` is a matrix and ``U``
+and ``V`` are represented by [`LDR`](@ref) factorizations.
 
 # Algorithm
 
-Letting ``U = [L_u D_u R_u] P_u^T`` and ``V = [L_v D_v R_v] P_v^T,`` the inverse matrix
-``G = (U^{-1} + V)^{-1}`` is calculated using the procedure
+The numerically stable inverse ``G := [U+V]^{-1}`` is calculated using the procedure
 ```math
 \begin{align*}
-G = & \left(U^{-1}+V\right)^{-1}\\
-  = & ([\stackrel{D_{u,\max}D_{u,\min}}{L_{u}\overbrace{D_{u}}R_{u}}P_{u}^{T}]^{-1}+\overset{D_{v,\min}D_{v,\max}}{L_{v}\overbrace{D_{v}}R_{v}}P_{v}^{T})^{-1}\\
-  = & \left(\left[L_{u}D_{u,\max}D_{u,\min}R_{u}P_{u}^{T}\right]^{-1}+L_{v}D_{v,\min}D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
-  = & \left(P_{u}R_{u}^{-1}D_{u,\min}^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}+L_{v}D_{v,\min}D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
-  = & \left(P_{u}R_{u}^{-1}D_{u,\min}^{-1}\left[D_{u,\max}^{-1}L_{u}^{\dagger}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}P_{u}^{T}L_{v}D_{v,\min}\right]D_{v,\max}R_{v}P_{v}^{T}\right)^{-1}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}(\overset{L_{0}D_{0}R_{0}P_{0}^{T}}{\overbrace{D_{u,\max}^{-1}L_{u}^{\dagger}P_{v}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}P_{u}^{T}L_{v}D_{v,\min}}})^{-1}D_{u,\min}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\left(L_{0}D_{0}R_{0}P_{0}^{T}\right)^{-1}D_{u,\min}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}D_{v,\max}^{-1}\overset{M}{\overbrace{P_{0}R_{0}^{-1}D_{0}^{-1}L_{0}^{\dagger}}}D_{u,\min}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}\overset{M'}{\overbrace{D_{v,\max}^{-1}MD_{u,\min}}}R_{u}P_{u}^{T}\\
-  = & P_{v}R_{v}^{-1}M'R_{u}P_{u}^{T},
+G:= & [U+V]^{-1}\\
+= & [\overset{D_{u,\max}D_{u,\min}}{L_{u}\overbrace{D_{u}}R_{u}}+\overset{D_{v,\min}D_{v,\max}}{L_{v}\overbrace{D_{v}}R_{v}}]^{-1}\\
+= & [L_{u}D_{u,\max}D_{u,\min}R_{u}+L_{v}D_{v,\min}D_{v,\max}R_{v}]^{-1}\\
+= & [L_{u}D_{u,\max}(D_{u,\min}R_{u}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min})D_{v,\max}R_{v}]^{-1}\\
+= & R_{v}^{-1}D_{v,\max}^{-1}[\overset{M}{\overbrace{D_{u,\min}R_{u}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\max}^{-1}L_{u}^{\dagger}L_{v}D_{v,\min}}}]^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}\\
+= & R_{v}^{-1}D_{v,\max}^{-1}M^{-1}D_{u,\max}^{-1}L_{u}^{\dagger},
 \end{align*}
 ```
-where ``D_\textrm{min} = \min(D,1)`` and ``D_\textrm{max} = \max(D,1).``
-"""
-function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T}, ws::LDRWorkspace{T};
-                     F::LDR{T}=ldr(F)) where {T}
-
-    inv_invUpV!(G, Fᵤ, Fᵥ, F=F, dᵤ_min=ws.v, dᵤ_max=ws.v′, dᵥ_min=ws.v″, dᵥ_max=ws.v‴,
-                M=ws.M, M′=ws.M′, p=ws.p, p′=ws.p′)
-    return nothing
-end
-
-function inv_invUpV!(G::AbstractMatrix{T}, Fᵤ::LDR{T}, Fᵥ::LDR{T};
-                     F::LDR{T}=ldr(Fᵤ),
-                     dᵤ_min::AbstractVector{T}=similar(Fᵤ.d),
-                     dᵤ_max::AbstractVector{T}=similar(Fᵤ.d),
-                     dᵥ_min::AbstractVector{T}=similar(Fᵥ.d),
-                     dᵥ_max::AbstractVector{T}=similar(Fᵥ.d),
-                     M::AbstractMatrix{T}=similar(Fᵥ.L),
-                     M′::AbstractMatrix{T}=similar(Fᵥ.L),
-                     p::AbstractVector{Int}=similar(Fᵥ.pᵀ),
-                     p′::AbstractVector{Int}=similar(Fᵥ.pᵀ)) where {T}
-
-    # calculate Dᵤ₋ = min(Dᵤ,1) and Dᵤ₊⁻¹ = [max(Dᵤ,1)]⁻¹
-    @. dᵤ_min = min(Fᵤ.d, 1)
-    @. dᵤ_max = max(Fᵤ.d, 1)
-    @. dᵥ_min = min(Fᵥ.d, 1)
-    @. dᵥ_max = max(Fᵥ.d, 1)
-
-    # calculate Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-    pᵥ = p
-    inv_P!(pᵥ, Fᵥ.pᵀ)
-    Lᵤᵀ = M
-    adjoint!(Lᵤᵀ, Fᵤ.L)
-    Rᵥ = UpperTriangular(Fᵥ.R)
-    copyto!(F.L, I) # I
-    ldiv!(Rᵥ, F.L) # Rᵥ⁻¹
-    mul_P!(M′, pᵥ, F.L) # Pᵥ⋅Rᵥ⁻¹
-    mul!(F.L, Lᵤᵀ, M′) # Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹
-
-    # calculate Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹]⋅Dᵥ₊⁻¹
-    @fastmath @inbounds for i in eachindex(dᵥ_max)
-        for j in eachindex(dᵤ_max)
-            F.L[j,i] = F.L[j,i] / dᵤ_max[j] / dᵥ_max[i]
-        end
-    end
-
-    # calculate Rᵤ⋅Pᵤᵀ⋅Lᵥ
-    Rᵤ = UpperTriangular(Fᵤ.R)
-    copyto!(F.R, Fᵥ.L) # Lᵥ
-    mul_P!(M′, Fᵤ.pᵀ, F.R) # Pᵤᵀ⋅Lᵥ
-    mul!(F.R, Rᵤ, M′) # Rᵤ⋅Pᵤᵀ⋅Lᵥ
-
-    # calculate Dᵤ₋⋅[Rᵤ⋅Pᵤᵀ⋅Lᵥ]⋅Dᵥ₋
-    @fastmath @inbounds for i in eachindex(dᵥ_min)
-        for j in eachindex(dᵤ_min)
-            F.R[j,i] = F.R[j,i] * dᵤ_min[j] * dᵥ_min[i]
-        end
-    end
-
-    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Lᵥ⋅Dᵥ₋
-    @. F.L = F.L + F.R
-
-    # calculate [L₀⋅D₀⋅R₀⋅P₀ᵀ] = [Dᵤ₊⁻¹⋅Lᵤᵀ⋅Pᵥ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Pᵤᵀ⋅Lᵥ⋅Dᵥ₋]
-    ldr!(F)
-
-    # calculate P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ = [L₀⋅D₀⋅R₀⋅P₀ᵀ]⁻¹
-    inv!(M, F, M=M′, p=p′)
-
-    # calculate Dᵥ₊⁻¹⋅[P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ]⋅Dᵤ₋
-    @fastmath @inbounds for i in eachindex(dᵤ_min)
-        for j in eachindex(dᵥ_max)
-            G[j,i] = M[j,i] * dᵤ_min[i] / dᵥ_max[j]
-        end
-    end
-
-    # calculate Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
-    rmul!(G, Rᵤ) # [Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ
-    ldiv!(Rᵥ, G) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ
-    mul_P!(M, G, Fᵤ.pᵀ) # Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
-    mul_P!(G, pᵥ, M) # Pᵥ⋅Rᵥ⁻¹⋅[Dᵥ₊⁻¹⋅P₀⋅R₀⁻¹⋅D₀⁻¹⋅L₀ᵀ⋅Dᵤ₋]⋅Rᵤ⋅Pᵤᵀ
-
-    return nothing
-end
-
-
-
-@doc raw"""
-    sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T}
-
-    sign_det(F::LDR{T}) where {T<:Real}
-
-    sign_det(F::LDR{T}; M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
-
-Returns the sign/phase factor of the determinant for a matrix ``A`` represented by the
-[`LDR`](@ref) factorization `F`, which is calculated as
+where
 ```math
-\textrm{sgn}(\det A) = \det L \cdot \left( \prod_i R_{i,i} \right) \cdot \det P^T,
+\begin{align*}
+D_{u,\min} = & \min(D_u,1)\\
+D_{u,\max} = & \max(D_u,1)\\
+D_{v,\min} = & \min(D_v,1)\\
+D_{v,\max} = & \max(D_v,1),
+\end{align*}
 ```
-where ``A = [L D R]P^T.``
+and all intermediate matrix inversions and determinant calculations are performed via LU factorizations with partial pivoting.
 """
-function sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Real}
+function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-    return sign_det(F)
-end
+    Lᵤ = U.L
+    dᵤ = U.d
+    Rᵤ = U.R
+    Lᵥ = V.L
+    dᵥ = V.d
+    Rᵥ = V.R
 
-function sign_det(F::LDR{T}) where {T<:Real}
+    # calculate sign(det(Lᵤ)) and log(|det(Lᵤ)|)
+    copyto!(ws.M, Lᵤ)
+    logdetLᵤ, sgndetLᵤ = det_lu!(ws.M, ws.lu_ws)
 
-    sgn::T = 1
-    # calculate the product of diagonal elements of R matrix
-    for i in eachindex(F.d)
-        rᵢ  = F.R[i,i]
-        sgn = sgn * rᵢ
-    end
-    # account for sign of L
-    sgn = -sgn
-    # multiply by det(Pᵀ) <==> sign/parity of pᵀ
-    sgn = sgn * perm_sign(F.pᵀ)
-    # normalize
-    sgn = sgn/abs(sgn)
+    # calculate Rᵥ⁻¹, sign(det(Rᵥ⁻¹)) and log(|det(Rᵥ⁻¹)|)
+    Rᵥ⁻¹ = ws.M′
+    copyto!(Rᵥ⁻¹, Rᵥ)
+    logdetRᵥ⁻¹, sgndetRᵥ⁻¹ = inv_lu!(Rᵥ⁻¹, ws.lu_ws)
 
-    return sgn
-end
+    # calcuate Dᵥ₊ = max(Dᵥ, 1)
+    dᵥ₊ = ws.v
+    @. dᵥ₊ = max(dᵥ, 1)
 
-function sign_det(F::LDR{T}, ws::LDRWorkspace{T}) where {T<:Complex}
+    # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
+    logdetDᵥ₊, sgndetDᵥ₊ = det_D(dᵥ₊)
 
-    return sign_det(F, M=ws.M)
-end
+    # calculate Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    rdiv_D!(Rᵥ⁻¹, dᵥ₊)
+    Rᵥ⁻¹Dᵥ₊⁻¹ = Rᵥ⁻¹
 
-function sign_det(F::LDR{T};
-                  M::AbstractMatrix{T}=similar(F.L)) where {T<:Complex}
+    # calcuate Dᵤ₊ = max(Dᵤ, 1)
+    dᵤ₊ = ws.v
+    @. dᵤ₊ = max(dᵤ, 1)
 
-    sgn::T = 1
-    # calculate the product of diagonal elements of R matrix
-    for i in eachindex(F.d)
-        rᵢ  = F.R[i,i]
-        sgn = sgn * rᵢ
-    end
-    # account of det(L) phase
-    copyto!(M,F.L)
-    sgn = sgn * det(LinearAlgebra.lu!(M))
-    # multiply by det(Pᵀ) <==> sign/parity of pᵀ
-    sgn = sgn * perm_sign(F.pᵀ)
-    # normalize
-    sgn = sgn/abs(sgn)
+    # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
+    logdetDᵤ₊, sgndetDᵤ₊ = det_D(dᵤ₊)
+    
+    # calcualte Dᵤ₊⁻¹⋅Lᵤᵀ
+    adjoint!(ws.M, Lᵤ)
+    ldiv_D!(dᵤ₊, ws.M)
+    Dᵤ₊⁻¹Lᵤᵀ = ws.M
 
-    return sgn
+    # calculate Dᵤ₋ = min(Dᵤ, 1)
+    dᵤ₋ = ws.v
+    @. dᵤ₋ = min(dᵤ, 1)
+    
+    # calculate Dᵤ₋⋅Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    mul!(G, Rᵤ, Rᵥ⁻¹Dᵥ₊⁻¹) # Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    lmul_D!(dᵤ₋, G) # Dᵤ₋⋅[Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊]
+
+    # calculate Dᵥ₋ = min(Dᵥ, 1)
+    dᵥ₋ = ws.v
+    @. dᵥ₋ = min(dᵥ, 1)
+
+    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
+    mul!(ws.M″, Dᵤ₊⁻¹Lᵤᵀ, Lᵥ)
+    rmul_D!(ws.M″, dᵥ₋)
+
+    # calculate M = Dᵤ₋⋅Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
+    M = G
+    @. M = M + ws.M″
+
+    # calculate M⁻¹, sign(det(M)) and log(|det(M)|)
+    M⁻¹ = G
+    logdetM⁻¹, sgndetM⁻¹ = inv_lu!(M⁻¹, ws.lu_ws)
+
+    # calculate G = Rᵥ⁻¹⋅Dᵥ₊⁻¹⋅M⁻¹⋅Dᵤ₊⁻¹⋅Lᵤᵀ
+    mul!(ws.M″, Rᵥ⁻¹Dᵥ₊⁻¹, M⁻¹) # [Rᵥ⁻¹⋅Dᵥ₊⁻¹]⋅M⁻¹
+    mul!(G, ws.M″, Dᵤ₊⁻¹Lᵤᵀ) # G = [Rᵥ⁻¹⋅Dᵥ₊⁻¹⋅M⁻¹]⋅Dᵤ₊⁻¹⋅Lᵤᵀ
+
+    # calculate sign(det(G)) and log(|det(G)|)
+    sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * conj(sgndetDᵤ₊) * conj(sgndetLᵤ)
+    logdetG = logdetRᵥ⁻¹ -      logdetDᵥ₊  + logdetM⁻¹ -      logdetDᵤ₊  -      logdetLᵤ
+
+    return logdetG, sgndetG
 end
 
 
 @doc raw"""
-    abs_det(F::LDR{T}; as_log::Bool=false) where {T}
+    inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the absolute value of determinant of the [`LDR`](@ref) factorization `F`.
-If `as_log=true`, then the log of the absolute value of the determinant is
-returned instead.
+Calculate the numerically stable inverse ``G := [U^{-1}+V]^{-1},`` where ``G`` is a matrix and ``U``
+and ``V`` are represented by [`LDR`](@ref) factorizations.
 
 # Algorithm
 
-Given an [`LDR`](@ref) factorization ``[L D R]P^T,`` calculate the absolute value of the determinant as
+The numerically stable inverse ``G := [U^{-1}+V]^{-1}`` is calculated using the procedure
 ```math
-\exp\left\{ \sum_i \log(D[i]) \right\},
+\begin{align*}
+G:= & [U^{-1}+V]^{-1}\\
+= & [\overset{D_{u,\max}D_{u,\min}}{(L_{u}\overbrace{D_{u}}R_{u})^{-1}}+\overset{D_{v,\min}D_{v,\max}}{L_{v}\overbrace{D_{v}}R_{v}}]^{-1}\\
+= & [(L_{u}D_{u,\max}D_{u,\min}R_{u})^{-1}+L_{v}D_{v,\min}D_{v,\max}R_{v}]^{-1}\\
+= & [R_{u}^{-1}D_{u,\min}^{-1}D_{u,\max}^{-1}L_{u}^{\dagger}+L_{v}D_{v,\min}D_{v,\max}R_{v}]^{-1}\\
+= & [R_{u}^{-1}D_{u,\min}^{-1}(D_{u,\max}^{-1}L_{u}^{\dagger}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}L_{v}D_{v,\min})D_{v,\max}R_{v}]^{-1}\\
+= & R_{v}^{-1}D_{v,\max}^{-1}[\overset{M}{\overbrace{D_{u,\max}^{-1}L_{u}^{\dagger}R_{v}^{-1}D_{v,\max}^{-1}+D_{u,\min}R_{u}L_{v}D_{v,\min}}}]^{-1}D_{u,\min}R_{u}\\
+= & R_{v}^{-1}D_{v,\max}^{-1}M^{-1}D_{u,\min}R_{u}
+\end{align*}
 ```
-where ``D`` is a diagonal matrix with strictly positive real matrix elements.
-"""
-function abs_det(F::LDR{T}; as_log::Bool=false) where {T}
-
-    # calculate log(|det(A)|)
-    absdet = 0.0
-    for i in eachindex(F.d)
-        absdet += log(F.d[i])
-    end
-
-    # |det(A)|
-    if !as_log
-        absdet = exp(absdet)
-    end
-
-    return absdet
-end
-
-
-@doc raw"""
-    abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T};
-                  as_log::Bool=false) where {T}
-                  
-    abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
-                  as_log::Bool=false,
-                  p::AbstractVector{Int}=similar(F₁.pᵀ),
-                  p′::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
-
-Given two matrices ``A_2`` and ``A_1`` represented by the [`LDR`](@ref) factorizations
-`F₂` and `F₁` respectively, calculate the absolute value of the determinant ratio
-``\vert\det(A_2/A_1)\vert`` in a numerically stable fashion. If `as_log=true`, then
-this function instead returns ``\log \left( \vert\det(A_2/A_1)\vert \right).``
-
-# Algorithm
-
-Let ``A_1 = [L_1 D_1 R_1] P_1^T`` and ``A_2 = [L_2 D_2 R_2] P_1^T`` be ``N \times N``
-square matrices each represented by their respective [`LDR`](@ref) factorizations.
-Let us define perumations ``p_1^{(1)} \dots p_1^{(i)} \dots p_1^{(N)}`` and 
-``p_2^{(1)} \dots p_2^{(i)} \dots p_2^{(N)}`` that sort the diagonal elements
-of ``D_1`` and ``D_2`` from smallest to largest. Then a numerically stable expression
-for evaulating the absolute value of the determinant ratio is
+where
 ```math
-\vert \det(A_2/A_1) \vert = \exp\left\{ \sum_i \left( \log(D_2[p_2^{(i)}])
-- \log(D_1[p_1^{(i)}]) \right) \right\},
+\begin{align*}
+D_{u,\min} = & \min(D_u,1)\\
+D_{u,\max} = & \max(D_u,1)\\
+D_{v,\min} = & \min(D_v,1)\\
+D_{v,\max} = & \max(D_v,1),
+\end{align*}
 ```
-keeping in mind that the diagonal elements of ``D_1`` and ``D_2`` are stictly
-positive real numbers.
+and all intermediate matrix inversions and determinant calculations are performed via LU factorizations with partial pivoting.
 """
-function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T}, ws::LDRWorkspace{T};
-                       as_log::Bool=false) where {T}
+function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-    return abs_det_ratio(F₂, F₁, p=ws.p, p′=ws.p′, as_log=as_log)
-end
+    Lᵤ = U.L
+    dᵤ = U.d
+    Rᵤ = V.R
+    Lᵥ = V.L
+    dᵥ = V.d
+    Rᵥ = V.R
 
-function abs_det_ratio(F₂::LDR{T}, F₁::LDR{T};
-                       as_log::Bool=false,
-                       p::AbstractVector{Int}=similar(F₁.pᵀ),
-                       p′::AbstractVector{Int}=similar(F₁.pᵀ)) where {T}
+    # calcualte sign(det(Rᵤ)) and log(|det(Rᵤ)|)
+    copyto!(ws.M′, Rᵤ)
+    logdetRᵤ, sgndetRᵤ = det_lu!(ws.M′, ws.lu_ws)
 
-    @assert size(F₂) == size(F₁)
+    # calculate Dᵤ₋ = min(Dᵤ, 1)
+    dᵤ₋ = ws.v
+    @. dᵤ₋ = min(dᵤ, 1)
 
-    # sort diagonal matrix elements of D₁
-    sortperm!(p, F₁.d)
-    d₁ = @view F₁.d[p]
+    # calculate sign(det(Dᵤ₋)) and log(|det(Dᵤ₋)|)
+    logdetDᵤ₋, sgndetDᵤ₋ = det_D(dᵤ₋)
 
-    # sort diagonal matrix elements of D₂
-    sortperm!(p′, F₂.d)
-    d₂ = @view F₂.d[p′]
+    # calculate Dᵤ₋⋅Rᵤ
+    Dᵤ₋Rᵤ = ws.M′
+    copyto!(Dᵤ₋Rᵤ, Rᵤ)
+    lmul_D!(dᵤ₋, Dᵤ₋Rᵤ)
 
-    # calculat the log(|det(A₂/A₁)|) = log(|det(A₂)|) - log(|det(A₁)|)
-    lndetR = 0.0
-    for i in eachindex(d₁)
-        lndetR += log(d₂[i]) - log(d₁[i])
-    end
+    # calculate Rᵥ⁻¹, sign(det(Rᵥ⁻¹)) and log(|det(Rᵥ⁻¹)|)
+    Rᵥ⁻¹ = ws.M″
+    copyto!(Rᵥ⁻¹, Rᵥ)
+    logdetRᵥ⁻¹, sgndetRᵥ⁻¹ = inv_lu!(Rᵥ⁻¹, ws.lu_ws)
 
-    if as_log
-        R = lndetR
-    else
-        # calculate |det(A₂/A₁)|
-        R = exp(lndetR)
-    end
+    # calculate Dᵥ₊ = max(Dᵥ, 1)
+    dᵥ₊ = ws.v
+    @. dᵥ₊ = max(dᵥ, 1)
 
-    return R
+    # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
+    logdetDᵥ₊, sgndetDᵥ₊ = det_D(dᵥ₊)
+
+    # calculate Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    Rᵥ⁻¹Dᵥ₊⁻¹ = Rᵥ⁻¹
+    rdiv_D!(Rᵥ⁻¹Dᵥ₊⁻¹, dᵥ₊)
+
+    # calculate Dᵥ₋ = min(Dᵥ, 1)
+    dᵥ₋ = ws.v
+    @. dᵥ₋ = min(dᵥ, 1)
+
+    # calculate Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
+    mul!(G, Dᵤ₋Rᵤ, Lᵥ) # Dᵤ₋⋅Rᵤ⋅Lᵥ
+    rmul_D!(G, dᵥ₋) # [Dᵤ₋⋅Rᵤ⋅Lᵥ]⋅Dᵥ₋
+
+    # calculate Dᵤ₊ = max(Dᵤ, 1)
+    dᵤ₊ = ws.v
+    @. dᵤ₊ = max(dᵤ, 1)
+
+    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
+    Lᵤᵀ = adjoint(Lᵤ)
+    mul!(ws.M, Lᵤᵀ, Rᵥ⁻¹Dᵥ₊⁻¹) # Lᵤᵀ⋅[Rᵥ⁻¹⋅Dᵥ₊⁻¹]
+    ldiv_D!(dᵤ₊, ws.M) # Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹]
+
+    # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
+    @. G += ws.M
+
+    # calculate M⁻¹, sign(det(M⁻¹)) and log(|det(M⁻¹)|)
+    M⁻¹ = G
+    logdetM⁻¹, sgndetM⁻¹ = inv_lu!(M⁻¹, ws.lu_ws)
+
+    # calculate G := Rᵥ⁻¹⋅Dᵥ₊⁻¹⋅M⁻¹⋅Dᵤ₋⋅Rᵤ
+    mul!(ws.M, M⁻¹, Dᵤ₋Rᵤ) # M⁻¹⋅Dᵤ₋⋅Rᵤ
+    mul!(G, Rᵥ⁻¹Dᵥ₊⁻¹, ws.M) # G := Rᵥ⁻¹⋅Dᵥ₊⁻¹⋅[M⁻¹⋅Dᵤ₋⋅Rᵤ]
+
+    # calcualte sign(det(G)) and log(|det(G)|)
+    sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * sgndetDᵤ₋ * sgndetRᵤ
+    logdetG = logdetRᵥ⁻¹ -      logdetDᵥ₊  + logdetM⁻¹ + logdetDᵤ₋ + logdetRᵤ
+
+    return logdetG, sgndetG
 end

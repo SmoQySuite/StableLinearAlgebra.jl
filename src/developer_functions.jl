@@ -1,4 +1,22 @@
 @doc raw"""
+    det_D(d::AbstractVector{T}) where {T}
+
+Given a diagonal matrix ``D`` represented by the vector `d`,
+return ``\textrm{sign}(\det D)`` and ``\log(|\det A|).``
+"""
+function det_D(d::AbstractVector{T}) where {T}
+
+    logdetD = zero(real(T))
+    sgndetD = oneunit(T)
+    for i in eachindex(d)
+        logdetD += log(abs(d[i]))
+        sgndetD *= sign(d[i])
+    end
+
+    return logdetD, sgndetD
+end
+
+@doc raw"""
     mul_D!(A, d, B)
 
 Calculate the matrix product ``A = D \cdot B,`` where ``D`` is a diagonal matrix

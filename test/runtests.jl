@@ -1,16 +1,27 @@
 using StableLinearAlgebra
 using LinearAlgebra
 using Test
+using LatticeUtilities
 
-# calculate eigenenergies and eigenstates for 1D chain tight-binding model
-function hamiltonian(N, t, μ)
-        
-    H  = zeros(typeof(t),N,N)
-    for i in 1:N
-        j = mod1(i+1,N)
+# calculate eigenenergies and eigenstates for square lattice
+function hamiltonian(L, t, μ)
+
+    unit_cell = UnitCell(lattice_vecs = [[1.,0.],[0.,1.]], basis_vecs = [[0.,0.]])
+    lattice = Lattice(L = [L,L], periodic = [true,true])
+    bond_x = Bond(orbitals = (1,1), displacement = [1,0])
+    bond_y = Bond(orbitals = (1,1), displacement = [0,1])
+    neighbor_table = build_neighbor_table([bond_x, bond_y], unit_cell, lattice)
+    Nsites = get_num_sites(unit_cell, lattice)
+    Nbonds = size(neighbor_table, 2)
+    H = zeros(typeof(t),Nsites,Nsites)
+    for n in 1:Nbonds
+        i = neighbor_table[1,n]
+        j = neighbor_table[2,n]
+        H[j,i] = -t
+        H[i,j] = conj(-t)
+    end
+    for i in 1:Nsites
         H[i,i] = -μ
-        H[i,j] = -t
-        H[j,i] = conj(H[i,j])
     end
     ϵ, U = eigen(H)
     
@@ -40,17 +51,20 @@ end
 @testset "StableLinearAlgebra.jl" begin
     
     # system parameters
-    N     = 12 # system size
+    L     = 4 # linear system size
     t     = 1.0 # nearest neighbor hopping
     μ     = 0.0 # chemical potential
     β     = 40.0 # inverse temperature
     Δτ    = 0.1 # discretization in imaginary time
-    L     = round(Int,β/Δτ) # length of imaginary time axis
+    Lτ    = round(Int,β/Δτ) # length of imaginary time axis
     nstab = 10 # stabalization frequency
-    Nstab = L ÷ nstab # number of reduced propagator matrices
+    Nstab = Lτ  ÷ nstab # number of reduced propagator matrices
 
     # hamitlonian eigenenergies and eigenstates
-    ϵ, U, H = hamiltonian(N, t, μ)
+    ϵ, U, H = hamiltonian(L, t, μ)
+
+    # number of sites in lattice
+    N = size(H,1)
 
     # propagator matrix
     B = propagator(Δτ, ϵ, U)
@@ -108,6 +122,11 @@ end
     copyto!(A, F, ws)
     @test A ≈ I
 
+    # test inv!
+    F = ldr(B̄)
+    inv!(A, F, ws)
+    @test A ≈ B̄⁻¹
+
     # test ldiv!
     F = ldr(B̄)
     C = similar(A)
@@ -121,8 +140,8 @@ end
     F″ = ldr(F)
     copyto!(F′, I)
     ldiv!(F″, F, F′, ws)
-    copyto!(A, F″)
-    @test (A * B̄) ≈ I
+    copyto!(A, F″, ws)
+    @test A ≈ B̄⁻¹
 
     # test rdiv!
     F = ldr(B̄)

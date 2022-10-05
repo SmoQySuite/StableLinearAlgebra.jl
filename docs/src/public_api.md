@@ -22,42 +22,40 @@ ldr_workspace
 
 ## Overloaded Functions
 
+- [`eltype`](@ref)
 - [`size`](@ref)
 - [`copyto!`](@ref)
-- [`mul!`](@ref)
+- [`adjoint!`](@ref)
 - [`lmul!`](@ref)
 - [`rmul!`](@ref)
+- [`mul!`](@ref)
 - [`ldiv!`](@ref)
 - [`rdiv!`](@ref)
-- [`det`](@ref)
+- [`logabsdet`](@ref)
 
 ```@docs
+Base.eltype
 Base.size
 Base.copyto!
-LinearAlgebra.mul!
+LinearAlgebra.adjoint!
 LinearAlgebra.lmul!
 LinearAlgebra.rmul!
+LinearAlgebra.mul!
 LinearAlgebra.ldiv!
 LinearAlgebra.rdiv!
-LinearAlgebra.det
+LinearAlgebra.logabsdet
 ```
 
-## Exported Functions
+## Exported Function
 
-- [`inv!`](@ref)
 - [`inv_IpA!`](@ref)
 - [`inv_UpV!`](@ref)
+- [`inv_IpUV!`](@ref)
 - [`inv_invUpV!`](@ref)
-- [`sign_det`](@ref)
-- [`abs_det`](@ref)
-- [`abs_det_ratio`](@ref)
 
 ```@docs
-inv!
 inv_IpA!
 inv_UpV!
+inv_IpUV!
 inv_invUpV!
-sign_det
-abs_det
-abs_det_ratio
 ```

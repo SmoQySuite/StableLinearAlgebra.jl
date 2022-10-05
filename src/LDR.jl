@@ -1,30 +1,26 @@
 @doc raw"""
     LDR{T<:Number, E<:Real} <: Factorization{T}
 
-Represents the matrix factorization ``A P = L D R`` for a square matrix ``A,`` which may equivalently be
-written as ``A = (L D R) P^{-1} = (L D R) P^T``.
+Represents the matrix factorization ``A = L D R`` for a square matrix ``A``,
+where ``L`` is a unitary matrix, ``D`` is a diagonal matrix of strictly positive real numbers,
+and ``R`` is defined such that ``|\det R| = 1``.
 
-In the above ``L`` is a unitary matrix, ``D`` is a diagonal matrix of strictly positive real numbers,
-and ``R`` is an upper triangular matrix. Lastly, ``P`` is a permutation matrix, for which ``P^{-1}=P^T``.
-
-This factorization is based on a column-pivoted QR decomposition ``A P = Q R,`` such that
+This factorization is based on a column-pivoted QR decomposition ``A P = Q R',`` such that
 ```math
 \begin{align*}
-L &= Q \\
-D &= \vert \textrm{diag}(R) \vert \\
-R &= \vert \textrm{diag}(R) \vert^{-1} R \\
-P &= P.
+L &:= Q \\
+D &:= \vert \textrm{diag}(R') \vert \\
+R &:= \vert \textrm{diag}(R') \vert^{-1} R' P^T\\
 \end{align*}
 ```
 
 # Fields
 
-- `L::Matrix{T}`: The unitary matrix ``L.``
-- `d::Vector{E}`: A vector representing the diagonal matrix ``D.``
-- `R::Matrix{T}`: The upper triangular matrix ``R.``
-- `pᵀ::Vector{Int}`: A permutation vector representing the permuation matrix ``P^T.``
+- `L::Matrix{T}`: The left unitary matrix ``L`` in a [`LDR`](@ref) factorization.
+- `d::Vector{E}`: A vector representing the diagonal matrix ``D`` in a [`LDR`](@ref) facotorization.
+- `R::Matrix{T}`: The right matrix ``R`` in a [`LDR`](@ref) factorization.
 """
-struct LDR{T<:Number, E<:Real} <: Factorization{T}
+struct LDR{T<:Number, E<:AbstractFloat} <: Factorization{T}
 
     "The left unitary matrix ``L``."
     L::Matrix{T}
@@ -34,22 +30,31 @@ struct LDR{T<:Number, E<:Real} <: Factorization{T}
 
     "The right upper triangular matrix ``R``."
     R::Matrix{T}
-
-    "Permutation vector to represent permuation matrix ``P^T``."
-    pᵀ::Vector{Int}
-
-    "Workspace for calculating QR decomposition using LAPACK without allocations."
-    ws::QRPivotedWs{T, E}
 end
 
 
 @doc raw"""
     LDRWorkspace{T<:Number}
 
-A workspace to avoid temporary memory allocations when performing computations
-with an [`LDR`](@ref) factorization.
+A workspace to avoid dyanmic memory allocations when performing computations
+with a [`LDR`](@ref) factorization.
+
+# Fields
+
+- `qr_ws::QRWorkspace{T,E}`: [`QRWorkspace`](@ref) for calculating column pivoted QR factorization without dynamic memory allocations.
+- `lu_ws::LUWorkspace{T}`: [`LUWorkspace`](@ref) for calculating LU factorization without dynamic memory allocations.
+- `M::Matrix{T}`: Temporary storage matrix for avoiding dynamic memory allocations.
+- `M′::Matrix{T}`: Temporary storage matrix for avoiding dynamic memory allocations.
+- `M″::Matrix{T}`: Temporary storage matrix for avoiding dynamic memory allocations.
+- `v::Vector{T}`: Temporary storage vector for avoiding dynamic memory allocations.
 """
-struct LDRWorkspace{T<:Number}
+struct LDRWorkspace{T<:Number, E<:AbstractFloat}
+
+    "Workspace for calculating column pivoted QR factorization without allocations."
+    qr_ws::QRWorkspace{T,E}
+
+    "Workspace for calculating LU factorization without allocations."
+    lu_ws::LUWorkspace{T}
 
     "Temporary storage matrix."
     M::Matrix{T}
@@ -60,194 +65,175 @@ struct LDRWorkspace{T<:Number}
     "Temporary storage matrix."
     M″::Matrix{T}
 
-    "Temporary storage vector for permuation."
-    p::Vector{Int}
-
-    "Temporary storage vector for permuation."
-    p′::Vector{Int}
-
     "Temporary storage vector."
-    v::Vector{T}
-
-    "Temporary storage vector."
-    v′::Vector{T}
-
-    "Temporary storage vector."
-    v″::Vector{T}
-
-    "Temporary storage vector."
-    v‴::Vector{T}
+    v::Vector{E}
 end
 
 
 @doc raw"""
-    ldr(A::AbstractMatrix; qr_workspace::QRPivotedWs=QRPivotedWs(A))
+    ldr(A::AbstractMatrix{T}) where {T}
 
-Calculate and return the [`LDR`](@ref) decomposition for the matrix `A`.
+Allocate an [`LDR`](@ref) factorization based on `A`, but does not calculate its [`LDR`](@ref) factorization,
+instead initializing the factorization to the identity matrix.
 """
-function ldr(A::AbstractMatrix{T}; qr_workspace::QRPivotedWs=QRPivotedWs(A))::LDR{T} where {T}
+function ldr(A::AbstractMatrix{T}) where {T}
 
-    # make sure A is a square matrix
-    @assert size(A,1) == size(A,2)
-
-    # matrix dimension
-    n = size(A,1)
-
-    # allocate relevant arrays
-    L =  zeros(T,n,n)
-    R  = zeros(T,n,n)
-    if T <: Complex
-        E = T.types[1]
-        d = zeros(E,n)
-    else
-        d = zeros(T,n)
-    end
-
-    # allocate workspace for QR decomposition
-    copyto!(L,A)
-    pᵀ = similar(qr_workspace.jpvt)
-
-    # instantiate LDR decomposition
-    F = LDR(L,d,R,pᵀ,qr_workspace)
-
-    # calculate LDR decomposition
-    ldr!(F, A)
-    
+    n = checksquare(A)
+    E = real(T)
+    L = zeros(T,n,n)
+    d = zeros(E,n)
+    R = zeros(T,n,n)
+    F = LDR{T,E}(L,d,R)
+    ldr!(F, I)
     return F
 end
 
+@doc raw"""
+    ldr(A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+
+Return the [`LDR`](@ref) factorization of the matrix `A`.
+"""
+function ldr(A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+
+    F = ldr(A)
+    ldr!(F, A, ws)
+    return F
+end
 
 @doc raw"""
-    ldr(F::LDR; reuse_qr_workspace::Bool=false)
+    ldr(F::LDR{T}, ignore...) where {T}
 
-Return a new [`LDR`](@ref) factorization that is a copy of `F`. If `reuse_qr_workspace = true`,
-then the `F.ws::QRPivotedWs` instance is re-used in the new [`LDR`](@ref) factorization that is returned
-so as to avoid allocating a new instance of `QRPivotedWs`.
+Return a copy of the [`LDR`](@ref) factorization `F`.
 """
-function ldr(F::LDR; reuse_qr_workspace::Bool=false)
+function ldr(F::LDR{T}, ignore...) where {T}
 
-    if reuse_qr_workspace
-        F′ = ldr(F.L, qr_workspace = F.ws)
-    else
-        F′ = ldr(F.L)
-    end
-    copyto!(F′, F)
-
-    return F′
+    L = copy(F.L)
+    d = copy(F.d)
+    R = copy(F.R)
+    return LDR(L,d,R)
 end
 
 
-@doc raw"""``
-    ldr!(F::LDR, A::AbstractMatrix)
+@doc raw"""
+    ldr!(F::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the [`LDR`](@ref) decomposition `F` for the matrix `A`.
+Calculate the [`LDR`](@ref) factorization `F` for the matrix `A`.
 """
-function ldr!(F::LDR{T}, A::AbstractMatrix{T}) where {T}
-
-    @assert size(F) == size(A)
+function ldr!(F::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 
     copyto!(F.L, A)
-    ldr!(F)
+    return ldr!(F, ws)
+end
 
+@doc raw"""
+    ldr!(F::LDR{T}, I::UniformScaling, ignore...) where {T}
+
+Set the [`LDR`](@ref) factorization equal to the identity matrix.
+"""
+function ldr!(F::LDR{T}, I::UniformScaling, ignore...) where {T}
+
+    (; L, d, R) = F
+    copyto!(L, I)
+    fill!(d, 1)
+    copyto!(R, I)
     return nothing
 end
 
+@doc raw"""
+    ldr!(Fout::LDR{T}, Fin::LDR{T}, ignore...) where {T}
+
+Copy the [`LDR`](@ref) factorization `Fin` to `Fout`.
+"""
+function ldr!(Fout::LDR{T}, Fin::LDR{T}, ignore...) where {T}
+
+    copyto!(Fout.L, Fin.L)
+    copyto!(Fout.d, Fin.d)
+    copyto!(Fout.R, Fin.R)
+    return nothing
+end
 
 @doc raw"""
-    ldr!(F::LDR)
+    ldr!(F::LDR, ws::LDRWorkspace{T}) where {T}
 
-Re-calculate the [`LDR`](@ref) factorization `F` in-place based on the current contents
-of the matrix `F.L`.
+Calculate the [`LDR`](@ref) factorization for the matrix `F.L`.
 """
-function ldr!(F::LDR)
+function ldr!(F::LDR, ws::LDRWorkspace{T}) where{T}
 
-    (; L, d, R, pᵀ, ws) = F
+    (; qr_ws, M) = ws
+    (; L, d, R) = F
 
     # calclate QR decomposition
-    LAPACK.geqp3!(ws, L)
-
-    # record permutation matrix
-    copyto!(pᵀ, ws.jpvt)
+    LAPACK.geqp3!(L, qr_ws)
 
     # extract upper triangular matrix R
-    R′ = UpperTriangular(L)
-    copyto!(R, R′)
+    copyto!(M, L)
+    triu!(M)
 
     # set D = Diag(R), represented by vector d
-    @inbounds for i in 1:size(L,1)
-        d[i] = abs(R[i,i])
+    @fastmath @inbounds for i in 1:size(L,1)
+        d[i] = abs(M[i,i])
     end
 
     # calculate R = D⁻¹⋅R
-    ldiv_D!(d, R)
+    ldiv_D!(d, M)
+
+    # calculate R⋅Pᵀ
+    mul_P!(R, M, qr_ws.jpvt)
 
     # construct L (same as Q) matrix
-    LAPACK.orgqr!(ws, L)
-
-    return nothing
-end
-
-
-"""
-    ldr!(F::LDR, I::UniformScaling)
-
-Update the [`LDR`](@ref) factorization `F` to reflect the identity matrix.
-"""
-function ldr!(F::LDR, I::UniformScaling)
-
-    N = length(F.d)
-    copyto!(F.L, I)
-    @. F.d = 1
-    copyto!(F.R, I)
-    @. F.pᵀ = 1:N
+    LAPACK.orgqr!(L, qr_ws)
 
     return nothing
 end
 
 
 @doc raw"""
-    ldrs(A::AbstractMatrix{T}, N::Int; reuse_qr_workspace::Bool=false) where {T}
+    ldrs(A::AbstractMatrix{T}, N::Int) where {T}
 
-Return a vector of `N` [`LDR`](@ref) factorizations, where each one represent the matrix `A`.
-If `reuse_qr_workspace = true`, then the same `QRPivotedWs` instance is used in all [`LDR`](@ref)
-instances to save memory.
+Return a vector of [`LDR`](@ref) factorizations of length `N`, where each one represents the
+identity matrix of the same size as ``A``.
 """
-function ldrs(A::AbstractMatrix{T}, N::Int; reuse_qr_workspace::Bool=false) where {T}
+function ldrs(A::AbstractMatrix{T}, N::Int) where {T}
     
-    Fs = Vector{LDR{T}}(undef,0)
-    F1 = ldr(A)
-    push!(Fs, F1)
-    for i in 2:N
-        if reuse_qr_workspace
-            push!(Fs, ldr(A, qr_workspace = F1.ws))
-        else
-            push!(Fs, ldr(A))
-        end
+    Fs = LDR{T}[]
+    for i in 1:N
+        push!(Fs, ldr(A))
     end
+
     return Fs
 end
 
 
 @doc raw"""
-    ldrs(A::AbstractArray{T,3}; reuse_qr_workspace::Bool=false) where {T}
+    ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T}) where {T}
+
+Return a vector of [`LDR`](@ref) factorizations of length `N`, where each one represents the matrix `A`.
+"""
+function ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T}) where {T}
+    
+    Fs = LDR{T}[]
+    F = ldr(A, ws)
+    push!(Fs, F)
+    for i in 2:N
+        push!(Fs, ldr(F))
+    end
+
+    return Fs
+end
+
+
+@doc raw"""
+    ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace) where {T}
 
 Return a vector of [`LDR`](@ref) factorizations of length `size(A, 3)`, where there is an
-[`LDR`](@ref) factorization for each matrix `A[:,:,i]`. If `reuse_qr_workspace = true`,
-then the same `QRPivotedWs` instance is used in all [`LDR`](@ref) instances to save memory.
+[`LDR`](@ref) factorization for each matrix `A[:,:,i]`.
 """
-function ldrs(A::AbstractArray{T,3}; reuse_qr_workspace::Bool=false) where {T}
+function ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace) where {T}
     
     Fs = Vector{LDR{T}}(undef,0)
-    N  = size(A,3)
-    A₁ = @view A[:,:,1]
-    F₁ = ldr(A₁)
-    for i in 2:N
+    for i in axes(A,3)
         Aᵢ = @view A[:,:,i]
-        if reuse_qr_workspace
-            push!(Fs, ldr(Aᵢ, qr_workspace = F₁.ws))
-        else
-            push!(Fs, ldr(Aᵢ))
-        end
+        push!(Fs, ldr(Aᵢ, ws))
     end
     
     return Fs
@@ -255,48 +241,47 @@ end
 
 
 @doc raw"""
-    ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
+    ldrs!(Fs::AbstractVector{LDR{T}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T}) where {T}
 
-Update the vector `Fs` of [`LDR`](@ref) factorizations based on the sequence of matrices
-contained in `A`, such that `Fs[i]` is the [`LDR`](@ref) factorization for the matrix `A[:,:,i]`.
+Calculate the [`LDR`](@ref) factorization `Fs[i]` for the matrix `A[:,:,i]`.
 """
-function ldrs!(Fs::Vector{LDR{T}}, A::AbstractArray{T,3}) where {T}
-    
-    for i in 1:size(A,3)
+function ldrs!(Fs::AbstractVector{LDR{T}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T}) where {T}
+
+    for i in eachindex(Fs)
         Aᵢ = @view A[:,:,i]
-        ldr!(Fs[i], Aᵢ)
+        ldr!(Fs[i], Aᵢ, ws)
     end
-    
+
     return nothing
 end
+
 
 @doc raw"""
     ldr_workspace(A::AbstractMatrix)
 
     ldr_workspace(F::LDR)
-    
-    ldr_workspace(Fs::Vector{LDR})
 
 Return a [`LDRWorkspace`](@ref) that can be used to avoid dynamic memory allocations.
 """
-function ldr_workspace(A::AbstractMatrix)
+function ldr_workspace(A::AbstractMatrix{T}) where {T}
 
-    @assert size(A,1) == size(A,2)
+    if T<:Complex
+        # if T is complex, get E such that then T = Complex{E}
+        E = T.types[1]
+    else
+        # if T is real, then E = T
+        E = T
+    end
 
-    N  = size(A,1)
-    M  = similar(A)
-    M′ = similar(A)
-    M″ = similar(A)
-    p  = zeros(Int, N)
-    p′ = zeros(Int, N)
-    v  = zeros(eltype(A), N)
-    v′ = zeros(eltype(A), N)
-    v″ = zeros(eltype(A), N)
-    v‴ = zeros(eltype(A), N)
-    ws = LDRWorkspace(M, M′, M″, p, p′, v, v′, v″, v‴)
+    n  = checksquare(A)
+    M  = zeros(T, n, n)
+    M′ = zeros(T, n, n)
+    M″ = zeros(T, n, n)
+    v  = zeros(E, n)
+    qr_ws = QRWorkspace(A)
+    lu_ws = LUWorkspace(A)
 
-    return ws
+    return LDRWorkspace(qr_ws, lu_ws, M, M′, M″, v)
 end
 
 ldr_workspace(F::LDR) = ldr_workspace(F.L)
-ldr_workspace(Fs::Vector{LDR}) = ldr_workspace(Fs[1])
