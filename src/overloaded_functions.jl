@@ -15,14 +15,11 @@ eltype(F::LDR{T}) where {T} = T
 #############################
 
 @doc raw"""
-    size(F::LDR)
-
-    size(F::LDR, dims)
+    size(F::LDR, dim...)
 
 Return the size of the [`LDR`](@ref) factorization `F`.
 """
-size(F::LDR)       = size(F.L)
-size(F::LDR, dims) = size(F.L, dims)
+size(F::LDR, dim...) = size(F.L, dim...)
 
 
 ################################
@@ -428,26 +425,28 @@ V:= & U^{-1}V\\
 """
 function ldiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-    # calculate Lᵤ⁻¹⋅Lᵥ
-    Lᵤ = ws.M
-    copyto!(Lᵤ, U.L)
-    ldiv_lu!(Lᵤ, V.L, ws.lu_ws) # V.L = Lᵤ⁻¹⋅Lᵥ
+    # calculate Lᵤᵀ⋅Lᵥ
+    Lᵤᵀ = adjoint(U.L)
+    mul!(ws.M, Lᵤᵀ, V.L)
+    copyto!(V.L, ws.M)
 
     # record initial Rᵥ
-    Rᵥ = ws.M
+    Rᵥ = ws.M′
     copyto!(Rᵥ, V.R)
 
-    # calculate Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤ⁻¹⋅Lᵥ⋅Dᵥ
-    mul_D!(ws.M, V.L, V.d) # [Lᵤ⁻¹⋅Lᵥ]⋅Dᵥ
-    ldiv_D!(U.d, ws.M) # Dᵤ⁻¹⋅[Lᵤ⁻¹⋅Lᵥ⋅Dᵥ]
-    mul!(V.L, U.R, ws.M) # Rᵤ⁻¹⋅[Dᵤ⁻¹⋅Lᵤ⁻¹⋅Lᵥ⋅Dᵥ]
+    # calculate Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ
+    rmul_D!(V.L, V.d) # [Lᵤᵀ⋅Lᵥ]⋅Dᵥ
+    ldiv_D!(U.d, V.L) # Dᵤ⁻¹⋅[Lᵤᵀ⋅Lᵥ⋅Dᵥ]
+    Rᵤ = ws.M
+    copyto!(Rᵤ, U.R)
+    ldiv_lu!(Rᵤ, V.L, ws.lu_ws) # Rᵤ⁻¹⋅[Dᵤ⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ]
 
-    # calculate [L₀⋅D₀⋅R₀] = Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤ⁻¹⋅Lᵥ⋅Dᵥ
+    # calculate [L₀⋅D₀⋅R₀] = Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ
     ldr!(V, ws)
 
     # calculate R₁ = R₀⋅Rᵥ
-    mul!(ws.M′, V.R, Rᵥ)
-    copyto!(V.R, ws.M′)
+    mul!(ws.M, V.R, Rᵥ)
+    copyto!(V.R, ws.M)
 
     return nothing
 end
@@ -540,7 +539,7 @@ function rdiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
     Lᵥ = ws.M′
     copyto!(Lᵥ, V.L)
     ldiv_lu!(Lᵥ, ws.M, ws.lu_ws) # Lᵥ⁻¹
-    ldiv_d!(V.d, ws.M) # Dᵥ⁻¹⋅Lᵥ⁻¹
+    ldiv_D!(V.d, ws.M) # Dᵥ⁻¹⋅Lᵥ⁻¹
     Rᵥ = ws.M′
     copyto!(Rᵥ, V.R)
     ldiv_lu!(Rᵥ, ws.M, ws.lu_ws) # Rᵥ⁻¹⋅Dᵥ⁻¹⋅Lᵥ⁻¹
@@ -579,38 +578,41 @@ Calculate ``U := UV^{-1}`` using the procedure
 \begin{align*}
 U:= & UV^{-1}\\
 = & [L_{u}D_{u}R_{u}][L_{v}D_{v}R_{v}]^{-1}\\
-= & L_{u}D_{u}\overset{M}{\overbrace{R_{u}R_{v}^{-1}}}D_{v}^{-1}L_{v}^{-1}\\
-= & L_{u}\overset{L_{0}D_{0}R_{0}}{\overbrace{D_{u}MD_{v}^{-1}}}L_{v}^{-1}\\
-= & \overset{L_{1}}{\overbrace{L_{u}L_{0}^{\phantom{1}}}}\,\overset{D_{1}}{\overbrace{D_{0}^{\phantom{1}}}}\,\overset{R_{1}}{\overbrace{R_{0}L_{v}^{-1}}}\\
+= & L_{u}D_{u}\overset{M}{\overbrace{R_{u}R_{v}^{-1}}}D_{v}^{-1}L_{v}^{\dagger}\\
+= & L_{u}\overset{L_{0}D_{0}R_{0}}{\overbrace{D_{u}MD_{v}^{-1}}}L_{v}^{\dagger}\\
+= & \overset{L_{1}}{\overbrace{L_{u}L_{0}^{\phantom{1}}}}\,\overset{D_{1}}{\overbrace{D_{0}^{\phantom{1}}}}\,\overset{R_{1}}{\overbrace{R_{0}L_{v}^{\dagger}}}\\
 = & L_{1}D_{1}R_{1}.
 \end{align*}
 ```
 """
 function rdiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
+    # calculate Rᵥ⁻¹
+    Rᵥ⁻¹ = ws.M′
+    copyto!(Rᵥ⁻¹, V.R)
+    inv_lu!(Rᵥ⁻¹, ws.lu_ws)
+
+    # calculate M = Rᵤ⋅Rᵥ⁻¹
+    mul!(ws.M, U.R, Rᵥ⁻¹)
+
     # record original Lᵤ matrix
     Lᵤ = ws.M′
     copyto!(Lᵤ, U.L)
 
-    # calculate M = Rᵤ⋅Lᵥ
-    mul!(ws.M, U.R, V.L)
-
     # calculate Dᵤ⋅M⋅Dᵥ⁻¹
-    rdiv_D!(ws.M, V.d)
-    div_D!(U.L, U.d, ws.M)
+    div_D!(U.L, ws.M, V.d)
+    lmul_D!(U.d, U.L)
 
     # calculate [L₀⋅D₀⋅R₀] = Dᵤ⋅M⋅Dᵥ⁻¹
     ldr!(U, ws)
 
-    # calculate L₁ = Lᵤ⋅L₀
+    # L₁ = Lᵤ⋅L₀
     mul!(ws.M, Lᵤ, U.L)
     copyto!(U.L, ws.M)
 
-    # calculate R₁ = R₀⋅Lᵥ⁻¹
-    Lᵥ⁻¹ = ws.M′
-    copyto!(Lᵥ⁻¹, V.L)
-    inv_lu!(Lᵥ⁻¹, ws.lu_ws)
-    mul!(ws.M, U.R, Lᵥ⁻¹)
+    # calculate Rᵥ = R₀⋅Lᵥᵀ
+    Lᵥᵀ = adjoint(V.L)
+    mul!(ws.M, U.R, Lᵥᵀ)
     copyto!(U.R, ws.M)
 
     return nothing

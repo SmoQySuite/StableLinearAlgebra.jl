@@ -49,13 +49,13 @@ LinearAlgebra.logabsdet
 ## Exported Function
 
 - [`inv_IpA!`](@ref)
-- [`inv_UpV!`](@ref)
 - [`inv_IpUV!`](@ref)
+- [`inv_UpV!`](@ref)
 - [`inv_invUpV!`](@ref)
 
 ```@docs
 inv_IpA!
-inv_UpV!
 inv_IpUV!
+inv_UpV!
 inv_invUpV!
 ```

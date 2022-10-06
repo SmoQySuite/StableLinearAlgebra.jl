@@ -84,7 +84,7 @@ for (getrf, getri, getrs, elty, relty) in ((:dgetrf_, :dgetri_, :dgetrs_, :Float
         end
 
         # solve the linear system A⋅X = B, where A is represented by LU factorization and B is overwritten in-place
-        function getrs!(A::AbstractMatrix{$elty}, B::AbstractVecOrMat{$elty}, ws::LUWorkspace{$elty}; trans::AbstractChar=`N`)
+        function getrs!(A::AbstractMatrix{$elty}, B::AbstractVecOrMat{$elty}, ws::LUWorkspace{$elty}, trans::AbstractChar='N')
 
             require_one_based_indexing(A, B)
             chktrans(trans)
@@ -94,7 +94,6 @@ for (getrf, getri, getrs, elty, relty) in ((:dgetrf_, :dgetri_, :dgetrs_, :Float
             if n != size(B, 1)
                 throw(DimensionMismatch("B has leading dimension $(size(B,1)), but needs $n"))
             end
-            nrhs = size(B, 2)
             info = Ref{BlasInt}()
             ccall((@blasfunc($getrs), liblapack), Cvoid,
                   (Ref{UInt8}, Ref{BlasInt}, Ref{BlasInt}, Ptr{$elty}, Ref{BlasInt},

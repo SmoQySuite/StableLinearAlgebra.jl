@@ -50,7 +50,7 @@
 
 Calculate the numerically stable inverse ``G := [I + A]^{-1},`` where ``G`` is a matrix,
 and ``A`` is represented by a [`LDR`](@ref) factorization. This method also returns
-``\textrm{sign}(\det G)`` and ``\log( \vert \det G\ver ).``
+``\log( \vert \det G\vert )`` and ``\textrm{sign}(\det G).``
 
 # Algorithm
 
@@ -120,7 +120,8 @@ end
     inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
 Calculate the numerically stable inverse ``G := [I + UV]^{-1},`` where ``G`` is a matrix and
-``U`` and ``V`` are represented by [`LDR`](@ref) factorizations.
+``U`` and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
+``\log( \vert \det G\vert )`` and ``\textrm{sign}(\det G).``
 
 # Algorithm
 
@@ -188,7 +189,8 @@ end
     inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
 Calculate the numerically stable inverse ``G := [U+V]^{-1},`` where ``G`` is a matrix and ``U``
-and ``V`` are represented by [`LDR`](@ref) factorizations.
+and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
+``\log( \vert \det G\vert )`` and ``\textrm{sign}(\det G).``
 
 # Algorithm
 
@@ -295,7 +297,8 @@ end
     inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
 Calculate the numerically stable inverse ``G := [U^{-1}+V]^{-1},`` where ``G`` is a matrix and ``U``
-and ``V`` are represented by [`LDR`](@ref) factorizations.
+and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
+``\log( \vert \det G\vert )`` and ``\textrm{sign}(\det G).``
 
 # Algorithm
 

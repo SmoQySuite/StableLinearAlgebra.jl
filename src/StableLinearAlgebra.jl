@@ -10,7 +10,7 @@ using Base: require_one_based_indexing
 using LinearAlgebra: checksquare
 using LinearAlgebra: BlasInt, BlasFloat
 using LinearAlgebra.BLAS: @blasfunc
-using LinearAlgebra.LAPACK: chklapackerror, chkstride1
+using LinearAlgebra.LAPACK: chklapackerror, chkstride1, chktrans
 using LinearAlgebra.LAPACK
 const liblapack = "libblastrampoline"
 include("qr.jl") # wrap LAPACK column-pivoted QR factorization
