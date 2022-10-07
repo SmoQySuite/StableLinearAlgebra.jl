@@ -416,7 +416,7 @@ Calculate ``V := U^{-1}V`` using the procedure
 \begin{align*}
 V:= & U^{-1}V\\
 = & [L_{u}D_{u}R_{u}]^{-1}[L_{v}D_{v}R_{v}]\\
-= & R_{u}^{-1}D_{u}^{-1}\overset{M}{\overbrace{L_{u}^{-1}L_{v}}}D_{v}R_{v}\\
+= & R_{u}^{-1}D_{u}^{-1}\overset{M}{\overbrace{L_{u}^{\dagger}L_{v}}}D_{v}R_{v}\\
 = & \overset{L_{0}D_{0}R_{0}}{\overbrace{R_{u}^{-1}D_{u}^{-1}MD_{v}}}R_{v}\\
 = & \overset{L_{1}}{\overbrace{L_{0}}}\,\overset{D_{1}}{\overbrace{D_{0}^{\phantom{1}}}}\,\overset{R_{1}}{\overbrace{R_{0}R_{v}^{\phantom{1}}}}\\
 = & L_{1}D_{1}R_{1}.
