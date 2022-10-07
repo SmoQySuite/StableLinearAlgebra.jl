@@ -105,7 +105,7 @@ end
 @doc raw"""
     lmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the numerically stable product ``V := U V,`` where ``U`` is a matrix and ``V``` is an [`LDR`](@ref) factorization.
+Calculate the numerically stable product ``V := U V,`` where ``U`` is a matrix and ``V`` is an [`LDR`](@ref) factorization.
 
 # Algorithm
 
@@ -143,7 +143,7 @@ end
 @doc raw"""
     lmul!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 
-Calculate the numerically stable product ``V := U V,`` where ``U`` and ``V``` are both [`LDR`](@ref) factorizations.
+Calculate the numerically stable product ``V := U V,`` where ``U`` and ``V`` are both [`LDR`](@ref) factorizations.
 
 # Algorithm
 
