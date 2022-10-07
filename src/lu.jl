@@ -106,7 +106,7 @@ for (getrf, getri, getrs, elty, relty) in ((:dgetrf_, :dgetri_, :dgetrs_, :Float
 end
 
 @doc raw"""
-    lu_det!(A::AbstractMatrix{T}, ws::LUWorkspace) where {T}
+    det_lu!(A::AbstractMatrix{T}, ws::LUWorkspace) where {T}
 
 Return ``\log(|\det A|)`` and ``\textrm{sign}(\det A).``
 Note that ``A`` is left modified by this function.
