@@ -108,7 +108,7 @@ end
 @doc raw"""
     lu_det!(A::AbstractMatrix{T}, ws::LUWorkspace) where {T}
 
-Return ``\log(|\det A^{-1}|)`` and ``\textrm{sign}(\det A^{-1}).``
+Return ``\log(|\det A|)`` and ``\textrm{sign}(\det A).``
 Note that ``A`` is left modified by this function.
 """
 function det_lu!(A::AbstractMatrix{T}, ws::LUWorkspace{T}) where {T}
