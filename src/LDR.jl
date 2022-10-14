@@ -56,7 +56,7 @@ struct LDRWorkspace{T<:Number, E<:AbstractFloat}
     "Workspace for calculating LU factorization without allocations."
     lu_ws::LUWorkspace{T}
 
-    "Temporary storage matrix. This matrix is used/modified when a [`LDR`](@ref) factorization is calculated."
+    "Temporary storage matrix. This matrix is used/modified when a [`LDR`](@ref) factorization are calculated."
     M::Matrix{T}
 
     "Temporary storage matrix."
@@ -195,7 +195,7 @@ identity matrix of the same size as ``A``.
 """
 function ldrs(A::AbstractMatrix{T}, N::Int) where {T}
     
-    Fs = LDR{T}[]
+    Fs = LDR{T,real(T)}[]
     for i in 1:N
         push!(Fs, ldr(A))
     end
@@ -205,13 +205,13 @@ end
 
 
 @doc raw"""
-    ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T}) where {T}
+    ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T,E}) where {T,E}
 
 Return a vector of [`LDR`](@ref) factorizations of length `N`, where each one represents the matrix `A`.
 """
-function ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T}) where {T}
+function ldrs(A::AbstractMatrix{T}, N::Int, ws::LDRWorkspace{T,E}) where {T,E}
     
-    Fs = LDR{T}[]
+    Fs = LDR{T,E}[]
     F = ldr(A, ws)
     push!(Fs, F)
     for i in 2:N
@@ -223,14 +223,14 @@ end
 
 
 @doc raw"""
-    ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace) where {T}
+    ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Return a vector of [`LDR`](@ref) factorizations of length `size(A, 3)`, where there is an
 [`LDR`](@ref) factorization for each matrix `A[:,:,i]`.
 """
-function ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace) where {T}
+function ldrs(A::AbstractArray{T,3}, ws::LDRWorkspace{T,E}) where {T,E}
     
-    Fs = Vector{LDR{T}}(undef,0)
+    Fs = LDR{T,E}[]
     for i in axes(A,3)
         Aᵢ = @view A[:,:,i]
         push!(Fs, ldr(Aᵢ, ws))
@@ -241,11 +241,11 @@ end
 
 
 @doc raw"""
-    ldrs!(Fs::AbstractVector{LDR{T}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T}) where {T}
+    ldrs!(Fs::AbstractVector{LDR{T,E}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the [`LDR`](@ref) factorization `Fs[i]` for the matrix `A[:,:,i]`.
 """
-function ldrs!(Fs::AbstractVector{LDR{T}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T}) where {T}
+function ldrs!(Fs::AbstractVector{LDR{T,E}}, A::AbstractArray{T,3}, ws::LDRWorkspace{T,E}) where {T,E}
 
     for i in eachindex(Fs)
         Aᵢ = @view A[:,:,i]
@@ -265,21 +265,15 @@ Return a [`LDRWorkspace`](@ref) that can be used to avoid dynamic memory allocat
 """
 function ldr_workspace(A::AbstractMatrix{T}) where {T}
 
-    if T<:Complex
-        # if T is complex, get E such that then T = Complex{E}
-        E = T.types[1]
-    else
-        # if T is real, then E = T
-        E = T
-    end
-
+    E  = real(T)
     n  = checksquare(A)
     M  = zeros(T, n, n)
     M′ = zeros(T, n, n)
     M″ = zeros(T, n, n)
     v  = zeros(E, n)
-    qr_ws = QRWorkspace(A)
-    lu_ws = LUWorkspace(A)
+    copyto!(M, I)
+    qr_ws = QRWorkspace(M)
+    lu_ws = LUWorkspace(M)
 
     return LDRWorkspace(qr_ws, lu_ws, M, M′, M″, v)
 end
