@@ -1,7 +1,7 @@
 name = "StableLinearAlgebra"
 uuid = "7d06c537-f8ff-4c22-91e1-ce4088e3cfd7"
 authors = ["Benjamin Cohen-Stead <benwcs@gmail.com>"]
-version = "1.3.1"
+version = "1.3.2"
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

@@ -110,7 +110,7 @@ function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T
 
     # calculate sign(det(G)) and log(|det(G)|)
     sgndetG = sgndetRₐ⁻¹ * conj(sgndetD₊) * sgndetM⁻¹
-    logdetG = logdetRₐ⁻¹ -      logdetD₊  + logdetM⁻¹
+    logdetG = -logdetD₊  + logdetM⁻¹
 
     return logdetG, sgndetG
 end
@@ -179,7 +179,7 @@ function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{
 
     # calculate sign(det(G)) and log(|det(G)|)
     sgndetG = sgndetRᵥ⁻¹ * sgndetM⁻¹ * conj(sgndetLᵤ)
-    logdetG = logdetRᵥ⁻¹ + logdetM⁻¹ -      logdetLᵤ
+    logdetG = logdetM⁻¹
 
     return logdetG, sgndetG
 end
@@ -287,7 +287,7 @@ function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T
 
     # calculate sign(det(G)) and log(|det(G)|)
     sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * conj(sgndetDᵤ₊) * conj(sgndetLᵤ)
-    logdetG = logdetRᵥ⁻¹ -      logdetDᵥ₊  + logdetM⁻¹ -      logdetDᵤ₊  -      logdetLᵤ
+    logdetG = -logdetDᵥ₊ + logdetM⁻¹ - logdetDᵤ₊
 
     return logdetG, sgndetG
 end
@@ -396,7 +396,7 @@ function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspac
 
     # calcualte sign(det(G)) and log(|det(G)|)
     sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * sgndetDᵤ₋ * sgndetRᵤ
-    logdetG = logdetRᵥ⁻¹ -      logdetDᵥ₊  + logdetM⁻¹ + logdetDᵤ₋ + logdetRᵤ
+    logdetG = -logdetDᵥ₊ + logdetM⁻¹ + logdetDᵤ₋
 
     return logdetG, sgndetG
 end
