@@ -106,7 +106,7 @@ for (getrf, getri, getrs, elty, relty) in ((:dgetrf_, :dgetri_, :dgetrs_, :Float
 end
 
 @doc raw"""
-    det_lu!(A::AbstractMatrix{T}, ws::LUWorkspace) where {T}
+    det_lu!(A::AbstractMatrix{T}, ws::LUWorkspace{T}) where {T}
 
 Return ``\log(|\det A|)`` and ``\textrm{sign}(\det A).``
 Note that ``A`` is left modified by this function.
@@ -127,7 +127,7 @@ function det_lu!(A::AbstractMatrix{T}, ws::LUWorkspace{T}) where {T}
         end
     end
 
-    return logdetA, sgndetA
+    return real(logdetA), sgndetA
 end
 
 
@@ -145,7 +145,7 @@ function inv_lu!(A::AbstractMatrix{T}, ws::LUWorkspace{T}) where {T}
     # calculate matrix inverse
     LAPACK.getri!(A, ws)
 
-    return -logdetA, conj(sgndetA)
+    return real(-logdetA), conj(sgndetA)
 end
 
 
@@ -163,5 +163,5 @@ function ldiv_lu!(A::AbstractMatrix{T}, B::AbstractMatrix{T}, ws::LUWorkspace{T}
     # calculate the matrix product A⁻¹⋅B
     LAPACK.getrs!(A, B, ws)
 
-    return -logdetA, conj(sgndetA)
+    return real(-logdetA), conj(sgndetA)
 end

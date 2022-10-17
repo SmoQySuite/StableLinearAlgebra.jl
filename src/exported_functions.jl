@@ -46,7 +46,7 @@
 
 
 @doc raw"""
-    inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    inv_IpA!(G::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
 Calculate the numerically stable inverse ``G := [I + A]^{-1},`` where ``G`` is a matrix,
 and ``A`` is represented by a [`LDR`](@ref) factorization. This method also returns
@@ -69,7 +69,7 @@ where ``D_{a,\min} = \min(D_a, 1)`` and ``D_{a,\max} = \max(D_a, 1).``
 Intermediate matrix inversions and relevant determinant calculations are performed
 via LU factorizations with partial pivoting.
 """
-function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
     Lₐ = A.L
     dₐ = A.d
@@ -112,12 +112,12 @@ function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T
     sgndetG = sgndetRₐ⁻¹ * conj(sgndetD₊) * sgndetM⁻¹
     logdetG = -logdetD₊  + logdetM⁻¹
 
-    return logdetG, sgndetG
+    return real(logdetG), sgndetG
 end
 
 
 @doc raw"""
-    inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
 Calculate the numerically stable inverse ``G := [I + UV]^{-1},`` where ``G`` is a matrix and
 ``U`` and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
@@ -137,7 +137,7 @@ G:= & [I+UV]^{-1}\\
 Intermediate matrix inversions and relevant determinant calculations are performed
 via LU factorizations with partial pivoting.
 """
-function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
     Lᵤ = U.L
     dᵤ = U.d
@@ -181,12 +181,12 @@ function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{
     sgndetG = sgndetRᵥ⁻¹ * sgndetM⁻¹ * conj(sgndetLᵤ)
     logdetG = logdetM⁻¹
 
-    return logdetG, sgndetG
+    return real(logdetG), sgndetG
 end
 
 
 @doc raw"""
-    inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    inv_UpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
 Calculate the numerically stable inverse ``G := [U+V]^{-1},`` where ``G`` is a matrix and ``U``
 and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
@@ -216,7 +216,7 @@ D_{v,\max} = & \max(D_v,1),
 ```
 and all intermediate matrix inversions and determinant calculations are performed via LU factorizations with partial pivoting.
 """
-function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
     Lᵤ = U.L
     dᵤ = U.d
@@ -289,12 +289,12 @@ function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T
     sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * conj(sgndetDᵤ₊) * conj(sgndetLᵤ)
     logdetG = -logdetDᵥ₊ + logdetM⁻¹ - logdetDᵤ₊
 
-    return logdetG, sgndetG
+    return real(logdetG), sgndetG
 end
 
 
 @doc raw"""
-    inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
 Calculate the numerically stable inverse ``G := [U^{-1}+V]^{-1},`` where ``G`` is a matrix and ``U``
 and ``V`` are represented by [`LDR`](@ref) factorizations. This method also returns
@@ -325,7 +325,7 @@ D_{v,\max} = & \max(D_v,1),
 ```
 and all intermediate matrix inversions and determinant calculations are performed via LU factorizations with partial pivoting.
 """
-function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
     Lᵤ = U.L
     dᵤ = U.d
@@ -398,5 +398,5 @@ function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspac
     sgndetG = sgndetRᵥ⁻¹ * conj(sgndetDᵥ₊) * sgndetM⁻¹ * sgndetDᵤ₋ * sgndetRᵤ
     logdetG = -logdetDᵥ₊ + logdetM⁻¹ + logdetDᵤ₋
 
-    return logdetG, sgndetG
+    return real(logdetG), sgndetG
 end

@@ -27,11 +27,11 @@ size(F::LDR, dim...) = size(F.L, dim...)
 ################################
 
 @doc raw"""
-    copyto!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    copyto!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Copy the matrix represented by the [`LDR`](@ref) factorization `V` into the matrix `U`.
 """
-function copyto!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function copyto!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     (; L, d, R) = V
     (; M) = ws
@@ -44,22 +44,22 @@ function copyto!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    copyto!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T})
+    copyto!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E} = ldr!(U,V,ws)
 
-    copyto!(U::LDR, I::UniformScaling, ignore...)
+    copyto!(U::LDR, I::UniformScaling, ignore...) = ldr!(U,I)
 
 Copy the matrix `V` to the [`LDR`](@ref) factorization `U`, calculating the
 [`LDR`](@ref) factorization to represent `V`.
 """
-copyto!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T} = ldr!(U,V,ws)
+copyto!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E} = ldr!(U,V,ws)
 copyto!(U::LDR, I::UniformScaling, ignore...) = ldr!(U,I)
 
 @doc raw"""
-    copyto!(U::LDR{T}, V::LDR{T}, ignore...) where {T}
+    copyto!(U::LDR{T,E}, V::LDR{T,E}, ignore...) where {T,E}
 
 Copy the ['LDR'](@ref) factorization `V` to `U`.
 """
-copyto!(U::LDR{T}, V::LDR{T}, ignore...) where {T} = ldr!(U, V)
+copyto!(U::LDR{T,E}, V::LDR{T,E}, ignore...) where {T,E} = ldr!(U, V)
 
 
 ##########################################
@@ -67,11 +67,11 @@ copyto!(U::LDR{T}, V::LDR{T}, ignore...) where {T} = ldr!(U, V)
 ##########################################
 
 @doc raw"""
-    adjoint!(Aᵀ::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    adjoint!(Aᵀ::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Given an [`LDR`](@ref) factorization ``A``, construct the matrix representing its adjoint ``A^{\dagger}.``
 """
-function adjoint!(Aᵀ::AbstractMatrix{T}, A::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function adjoint!(Aᵀ::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     (; L, d, R) = A
     Rᵀ = ws.M′
@@ -88,11 +88,11 @@ end
 #######################################
 
 @doc raw"""
-    lmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    lmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate ``V := U V`` where ``U`` is a [`LDR`](@ref) factorization and ``V`` is a matrix.
 """
-function lmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function lmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # calculate V := Lᵤ⋅Dᵤ⋅Rᵤ⋅V
     mul!(ws.M, U.R, V) # Rᵤ⋅V
@@ -103,7 +103,7 @@ function lmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    lmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    lmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``V := U V,`` where ``U`` is a matrix and ``V`` is an [`LDR`](@ref) factorization.
 
@@ -120,9 +120,9 @@ V:= & UV\\
 \end{align*}
 ```
 """
-function lmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function lmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
-    # record original Rₐ matrix
+    # record original Rᵥ matrix
     Rᵥ = ws.M′
     copyto!(Rᵥ, V.R)
 
@@ -133,7 +133,7 @@ function lmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
     # calcualte [L₀⋅D₀⋅R₀] = U⋅Lᵥ⋅Dᵥ
     ldr!(V, ws)
 
-    # calcualte R₁ = R₀⋅Rₐ
+    # calcualte R₁ = R₀⋅Rᵥ
     mul!(ws.M, V.R, Rᵥ)
     copyto!(V.R, ws.M)
 
@@ -141,7 +141,7 @@ function lmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    lmul!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    lmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``V := U V,`` where ``U`` and ``V`` are both [`LDR`](@ref) factorizations.
 
@@ -159,7 +159,7 @@ V:= & UV\\
 \end{align*}
 ```
 """
-function lmul!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function lmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # record original Rᵥ
     Rᵥ = ws.M′
@@ -192,11 +192,11 @@ end
 #######################################
 
 @doc raw"""
-    rmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate ``U := U V`` where ``U`` is a matrix and ``V`` is a [`LDR`](@ref) factorization.
 """
-function rmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # calculate U := U⋅Lᵥ⋅Dᵥ⋅Rᵥ
     mul!(ws.M, U, V.L) # U⋅Lᵥ
@@ -207,7 +207,7 @@ function rmul!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    rmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``U := U V,`` where ``U`` is a [`LDR`](@ref) factorization and ``V`` is a matrix.
 
@@ -224,7 +224,7 @@ U:= & UV\\
 \end{align*}
 ```
 """
-function rmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function rmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # record intial Lₐ
     Lᵤ = ws.M′
@@ -245,7 +245,7 @@ function rmul!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rmul!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``U := U V,`` where both ``U`` and ``V`` are [`LDR`](@ref) factorizations.
 
@@ -263,7 +263,7 @@ U:= & UV\\
 \end{align*}
 ```
 """
-function rmul!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # record initial Lᵤ
     Lᵤ = ws.M′
@@ -296,12 +296,12 @@ end
 ######################################
 
 @doc raw"""
-    mul!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    mul!(H::AbstractMatrix{T}, U::LDR{T,E}, V::AbstractMatrix{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the matrix product ``H := U V``, where ``H`` and ``V`` are matrices and ``U`` is
 a [`LDR`](@ref) factorization.
 """
-function mul!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function mul!(H::AbstractMatrix{T}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, V)
     lmul!(U, H, ws)
@@ -310,12 +310,12 @@ function mul!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWork
 end
 
 @doc raw"""
-    mul!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    mul!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the matrix product ``H := U V``, where ``H`` and ``U`` are matrices and ``V`` is
 a [`LDR`](@ref) factorization.
 """
-function mul!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function mul!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, U)
     rmul!(H, V, ws)
@@ -324,12 +324,12 @@ function mul!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWork
 end
 
 @doc raw"""
-    mul!(H::LDR{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    mul!(H::LDR{T,E}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U V``, where ``U`` is matrix, and ``H`` and
 ``V`` are both [`LDR`](@ref) factorization. For the algorithm refer to documentation for [`lmul!`](@ref).
 """
-function mul!(H::LDR{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function mul!(H::LDR{T,E}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, V)
     lmul!(U, H, ws)
@@ -338,12 +338,12 @@ function mul!(H::LDR{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) w
 end
 
 @doc raw"""
-    mul!(H::LDR{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    mul!(H::LDR{T,E}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U V``, where ``V`` is matrix, and ``H`` and
 ``U`` are both [`LDR`](@ref) factorizations. For the algorithm refer to the documentation for [`rmul!`](@ref).
 """
-function mul!(H::LDR{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function mul!(H::LDR{T,E}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, U)
     rmul!(H, V, ws)
@@ -352,12 +352,12 @@ function mul!(H::LDR{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) w
 end
 
 @doc raw"""
-    mul!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    mul!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable matrix product ``H := U V,`` where ``H,`` ``U`` and ``V`` are all
 [`LDR`](@ref) factorizations. For the algorithm refer to the documentation for [`lmul!`](@ref).
 """
-function mul!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function mul!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, V)
     lmul!(U, H, ws)
@@ -371,11 +371,11 @@ end
 #######################################
 
 @doc raw"""
-    ldiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate ``V := U^{-1} V,`` where ``V`` is a matrix, and ``U`` is an [`LDR`](@ref) factorization.
 """
-function ldiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # calculate V := U⁻¹⋅V = [Lᵤ⋅Dᵤ⋅Rᵤ]⁻¹⋅V = Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤ⁻¹⋅V
     Lᵤ = ws.M
@@ -390,11 +390,11 @@ function ldiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    ldiv!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(H::AbstractMatrix{T}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate ``H := U^{-1} V,`` where ``H`` and ``V`` are matrices, and ``U`` is an [`LDR`](@ref) factorization.
 """
-function ldiv!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(H::AbstractMatrix{T}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, V)
     ldiv!(U, H, ws)
@@ -402,7 +402,7 @@ function ldiv!(H::AbstractMatrix{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWor
 end
 
 @doc raw"""
-    ldiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``V := U^{-1}V`` where both ``U`` and ``V`` are [`LDR`](@ref) factorizations.
 Note that an intermediate LU factorization is required to calucate the matrix inverse ``R_u^{-1},`` in addition to the
@@ -423,7 +423,7 @@ V:= & U^{-1}V\\
 \end{align*}
 ```
 """
-function ldiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # calculate Lᵤᵀ⋅Lᵥ
     Lᵤᵀ = adjoint(U.L)
@@ -452,13 +452,13 @@ function ldiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    ldiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U^{-1} V,`` where ``H,`` ``U`` and ``V`` are all [`LDR`](@ref) factorizations.
 Note that an intermediate LU factorization is required to calucate the matrix inverse ``R_u^{-1},`` in addition to the
 intermediate [`LDR`](@ref) factorization that needs to occur.
 """
-function ldiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, V)
     ldiv!(U, H, ws)
@@ -467,7 +467,7 @@ function ldiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    ldiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``V := U^{-1} V,`` where ``U`` is a matrix and ``V`` is a [`LDR`](@ref) factorization.
 Note that an intermediate LU factorization is required as well to calucate the matrix inverse ``U^{-1},`` in addition to the
@@ -486,7 +486,7 @@ V:= & U^{-1}V\\
 \end{align*}
 ```
 """
-function ldiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # store Rᵥ for later
     Rᵥ = ws.M′
@@ -508,13 +508,13 @@ function ldiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    ldiv!(H::LDR{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    ldiv!(H::LDR{T,E}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U^{-1} V,`` where ``H`` and ``V`` are [`LDR`](@ref)
 factorizations and ``U`` is a matrix. Note that an intermediate LU factorization is required to
 calculate ``U^{-1},`` in addition to the intermediate [`LDR`](@ref) factorization that needs to occur.
 """
-function ldiv!(H::LDR{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function ldiv!(H::LDR{T,E}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T}) where {T,E}
 
     copyto!(H, V)
     ldiv!(U, H, ws)
@@ -527,12 +527,12 @@ end
 #######################################
 
 @doc raw"""
-    rdiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rdiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the matrix product ``U := U V^{-1},`` where ``V`` is an [`LDR`](@ref) factorization and ``U`` is a matrix.
 Note that this requires two intermediate LU factorizations to calculate ``L_v^{-1}`` and ``R_v^{-1}``.
 """
-function rdiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # U := U⋅Rᵥ⁻¹⋅Dᵥ⁻¹⋅Lᵥ⁻¹
     copyto!(ws.M, I)
@@ -550,12 +550,12 @@ function rdiv!(U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rdiv!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rdiv!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the matrix product ``H := U V^{-1},`` where ``H`` and ``U`` are matrices and ``V`` is a [`LDR`](@ref) factorization.
 Note that this requires two intermediate LU factorizations to calculate ``L_v^{-1}`` and ``R_v^{-1}``.
 """
-function rdiv!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, U)
     rdiv!(H, V, ws)
@@ -564,7 +564,7 @@ function rdiv!(H::AbstractMatrix{T}, U::AbstractMatrix{T}, V::LDR{T}, ws::LDRWor
 end
 
 @doc raw"""
-    rdiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rdiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``U := U V^{-1}`` where both ``U`` and ``V`` are [`LDR`](@ref) factorizations.
 Note that an intermediate LU factorization is required to calucate the matrix inverse ``L_v^{-1},`` in addition to the
@@ -585,7 +585,7 @@ U:= & UV^{-1}\\
 \end{align*}
 ```
 """
-function rdiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # calculate Rᵥ⁻¹
     Rᵥ⁻¹ = ws.M′
@@ -619,13 +619,13 @@ function rdiv!(U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rdiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+    rdiv!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U V^{-1}`` where ``H,`` ``U`` and ``V`` are all [`LDR`](@ref) factorizations.
 Note that an intermediate LU factorization is required to calucate the matrix inverse ``L_v^{-1},`` in addition to the
 intermediate [`LDR`](@ref) factorization that needs to occur.
 """
-function rdiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(H::LDR{T,E}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, U)
     rdiv!(H, V, ws)
@@ -634,7 +634,7 @@ function rdiv!(H::LDR{T}, U::LDR{T}, V::LDR{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rdiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace) where {T}
+    rdiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``U := U V^{-1},`` where ``V`` is a matrix and ``U`` is an [`LDR`](@ref) factorization.
 Note that an intermediate LU factorization is required as well to calucate the matrix inverse ``V^{-1},`` in addition to the
@@ -653,7 +653,7 @@ U:= & UV^{-1}\\
 \end{align*}
 ```
 """
-function rdiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     # record intial Lᵤ
     Lᵤ = ws.M′
@@ -676,13 +676,13 @@ function rdiv!(U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
 end
 
 @doc raw"""
-    rdiv!(H::LDR{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+    rdiv!(H::LDR{T,E}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
 Calculate the numerically stable product ``H := U V^{-1},`` where ``V`` is a matrix and ``H`` and ``U`` is an [`LDR`](@ref) factorization.
 Note that an intermediate LU factorization is required as well to calucate the matrix inverse ``V^{-1},`` in addition to the
 intermediate [`LDR`](@ref) factorization that needs to occur.
 """
-function rdiv!(H::LDR{T}, U::LDR{T}, V::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
+function rdiv!(H::LDR{T,E}, U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(H, U)
     rdiv!(H, V, ws)
@@ -700,7 +700,7 @@ end
 Calculate ``\log(\vert \det A \vert)`` and ``\textrm{sign}(\det A)`` for the
 [`LDR`](@ref) factorization ``A.``
 """
-function logabsdet(A::LDR{T}, ws::LDRWorkspace{T}) where {T}
+function logabsdet(A::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(ws.M, A.L)
     logdetL, sgndetL = det_lu!(ws.M, ws.lu_ws)
