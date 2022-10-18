@@ -246,11 +246,16 @@ end
     @test A ≈ I
 
     # testing inv_IpUV!
+    F′ = ldr(F)
     copyto!(F, I, ws)
+    copyto!(F′, I, ws)
     for i in 1:Nₛ÷2
-        lmul!(B̄, F, ws)
+        rmul!(F, B̄, ws)
     end
-    logdetG, sgndetG = inv_IpUV!(G, F, F, ws)
+    for i in Nₛ÷2+1:Nₛ
+        rmul!(F′, B̄, ws)
+    end
+    logdetG, sgndetG = inv_IpUV!(G, F, F′, ws)
     @test G ≈ G_0
     @test sgndetG ≈ sgndetG_0
     @test logdetG ≈ logdetG_0
