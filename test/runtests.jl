@@ -11,7 +11,7 @@ function hamiltonian(L, t, μ)
     bond_x = Bond(orbitals = (1,1), displacement = [1,0])
     bond_y = Bond(orbitals = (1,1), displacement = [0,1])
     neighbor_table = build_neighbor_table([bond_x, bond_y], unit_cell, lattice)
-    Nsites = get_num_sites(unit_cell, lattice)
+    Nsites = nsites(unit_cell, lattice)
     Nbonds = size(neighbor_table, 2)
     H = zeros(typeof(t),Nsites,Nsites)
     for n in 1:Nbonds

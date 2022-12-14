@@ -99,7 +99,7 @@ function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E})::Tup
     rdiv_D!(Rₐ⁻¹D₊, d₊)
 
     # calculate M = Rₐ⁻¹⋅D₊⁻¹ + Lₐ⋅D₋
-    @. ws.M += Rₐ⁻¹D₊
+    axpy!(1.0, Rₐ⁻¹D₊, ws.M)
 
     # calculate M⁻¹ = [Rₐ⁻¹⋅D₊⁻¹ + Lₐ⋅D₋]⁻¹
     M⁻¹ = ws.M
@@ -200,7 +200,7 @@ function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorksp
 
     # calculate M = Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
     M = G
-    @. M = ws.M″ + M
+    axpy!(1.0, ws.M″, M)
 
     # calculate M⁻¹, sign(det(M)) and log(|det(M)|)
     M⁻¹ = G
@@ -308,7 +308,7 @@ function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspa
 
     # calculate M = Dᵤ₋⋅Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
     M = G
-    @. M = M + ws.M″
+    axpy!(1.0, ws.M″, M)
 
     # calculate M⁻¹, sign(det(M)) and log(|det(M)|)
     M⁻¹ = G
@@ -417,7 +417,7 @@ function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWork
     ldiv_D!(dᵤ₊, ws.M) # Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹]
 
     # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
-    @. G += ws.M
+    axpy!(1.0, ws.M, G)
 
     # calculate M⁻¹, sign(det(M⁻¹)) and log(|det(M⁻¹)|)
     M⁻¹ = G
