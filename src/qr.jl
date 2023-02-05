@@ -14,6 +14,17 @@ struct QRWorkspace{T<:Number, E<:Real}
     jpvt::Vector{Int}
 end
 
+# copy the state of one QRWorkspace into another
+function copyto!(qrws_out::QRWorkspace{T,E}, qrws_in::QRWorkspace{T,E}) where {T,E}
+
+    copyto!(qrws_out.work, qrws_in.work)
+    copyto!(qrws_out.rwork, qrws_in.rwork)
+    copyto!(qrws_out.τ, qrws_in.τ)
+    copyto!(qrws_out.jpvt, qrws_in.jpvt)
+
+    return nothing
+end
+
 # wrap geqp3 and orgqr LAPACK methods
 for (geqp3, orgqr, elty, relty) in ((:dgeqp3_, :dorgqr_, :Float64,    :Float64),
                                     (:sgeqp3_, :sorgqr_, :Float32,    :Float32),

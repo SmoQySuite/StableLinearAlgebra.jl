@@ -13,6 +13,15 @@ struct LUWorkspace{T<:Number}
     ipiv::Vector{Int}
 end
 
+# copy the state of one LUWorkspace into another
+function copyto!(luws_out::LUWorkspace{T}, luws_in::LUWorkspace{T}) where {T}
+
+    copyto!(luws_out.work, luws_in.work)
+    copyto!(luws_out.ipiv, luws_in.ipiv)
+
+    return nothing
+end
+
 # wrap geqp3 and orgqr LAPACK methods
 for (getrf, getri, getrs, elty, relty) in ((:dgetrf_, :dgetri_, :dgetrs_, :Float64,    :Float64),
                                            (:sgetrf_, :sgetri_, :sgetrs_, :Float32,    :Float32),

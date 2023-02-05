@@ -1,6 +1,8 @@
 module StableLinearAlgebra
 
 using LinearAlgebra
+import LinearAlgebra: adjoint!, lmul!, rmul!, mul!, ldiv!, rdiv!, logabsdet
+import Base: eltype, size, copyto!
 
 # define developer functions/methods
 include("developer_functions.jl")
@@ -23,8 +25,6 @@ include("LDR.jl")
 export LDR, LDRWorkspace, ldr, ldr!, ldrs, ldrs!, ldr_workspace
 
 # define overloaded functions/methods
-import Base: eltype, size, copyto!
-import LinearAlgebra: adjoint!, lmul!, rmul!, mul!, ldiv!, rdiv!, logabsdet
 include("overloaded_functions.jl")
 
 # define exported functions/methods
