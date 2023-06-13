@@ -14,7 +14,7 @@ using LinearAlgebra: BlasInt, BlasFloat
 using LinearAlgebra.BLAS: @blasfunc
 using LinearAlgebra.LAPACK: chklapackerror, chkstride1, chktrans
 using LinearAlgebra.LAPACK
-const liblapack = "libblastrampoline"
+const liblapack = LinearAlgebra.LAPACK.liblapack
 include("qr.jl") # wrap LAPACK column-pivoted QR factorization
 export QRWorkspace
 include("lu.jl") # wrap LAPACK LU factorization (for determinants and matrix inversion)
