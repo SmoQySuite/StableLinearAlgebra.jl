@@ -57,7 +57,7 @@ copyto!(U::LDR, I::UniformScaling, ignore...) = ldr!(U,I)
 @doc raw"""
     copyto!(U::LDR{T,E}, V::LDR{T,E}, ignore...) where {T,E}
 
-Copy the ['LDR'](@ref) factorization `V` to `U`.
+Copy the [`LDR`](@ref) factorization `V` to `U`.
 """
 copyto!(U::LDR{T,E}, V::LDR{T,E}, ignore...) where {T,E} = ldr!(U, V)
 

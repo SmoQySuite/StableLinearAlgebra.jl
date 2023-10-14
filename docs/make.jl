@@ -3,11 +3,14 @@ using Documenter
 using DocumenterCitations
 using LinearAlgebra
 
+bib = CitationBibliography(
+    joinpath(@__DIR__, "src", "references.bib");
+    style=:numeric
+)
 DocMeta.setdocmeta!(StableLinearAlgebra, :DocTestSetup, :(using StableLinearAlgebra); recursive=true)
-bib = CitationBibliography(joinpath(@__DIR__, "references.bib"), sorting = :nyt)
 
-makedocs(
-    bib,
+makedocs(;
+    plugins=[bib],
     modules=[StableLinearAlgebra],
     authors="Benjamin Cohen-Stead <benwcs@gmail.com>",
     repo="https://github.com/SmoQySuite/StableLinearAlgebra.jl/blob/{commit}{path}#{line}",

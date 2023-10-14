@@ -16,5 +16,6 @@ A very similar Julia package implementing and exporting many of the same algorit
 To install [`StableLinearAlgebra.jl`](https://github.com/SmoQySuite/StableLinearAlgebra.jl) run following in the Julia REPL:
 
 ```julia
-] add StableLinearAlgebra
+julia> ]
+pkg> add StableLinearAlgebra
 ```
