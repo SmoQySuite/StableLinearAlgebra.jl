@@ -10,11 +10,11 @@ makedocs(
     bib,
     modules=[StableLinearAlgebra],
     authors="Benjamin Cohen-Stead <benwcs@gmail.com>",
-    repo="https://github.com/cohensbw/StableLinearAlgebra.jl/blob/{commit}{path}#{line}",
+    repo="https://github.com/SmoQySuite/StableLinearAlgebra.jl/blob/{commit}{path}#{line}",
     sitename="StableLinearAlgebra.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://cohensbw.github.io/StableLinearAlgebra.jl",
+        canonical="https://SmoQySuite.github.io/StableLinearAlgebra.jl",
         assets=String[],
     ),
     pages=[
@@ -25,6 +25,6 @@ makedocs(
 )
 
 deploydocs(;
-    repo="github.com/cohensbw/StableLinearAlgebra.jl",
+    repo="github.com/SmoQySuite/StableLinearAlgebra.jl",
     devbranch="master",
 )
