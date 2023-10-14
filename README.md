@@ -5,8 +5,6 @@
 [![Build Status](https://github.com/SmoQySuite/StableLinearAlgebra.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/SmoQySuite/StableLinearAlgebra.jl/actions/workflows/CI.yml?query=branch%3Amaster)
 [![Coverage](https://codecov.io/gh/SmoQySuite/StableLinearAlgebra.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/SmoQySuite/StableLinearAlgebra.jl)
 
-Documentation for [StableLinearAlgebra.jl](https://github.com/SmoQySuite/StableLinearAlgebra.jl).
-
 This package exports an LDR matrix factorization type for square matrices, along with a corresponding collection of functions for calculating numerically stable matrix products and matrix inverses. The methods exported by the package are essential
 for implementing a determinant quantum Monte Carlo (DQMC) code for simulating interacting itinerant electrons on a lattice.
 
