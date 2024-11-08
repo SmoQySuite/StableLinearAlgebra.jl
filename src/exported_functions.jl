@@ -1,50 +1,3 @@
-# @doc raw"""
-#     adjoint_inv_ldr!(A⁻ᵀ::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
-
-# Given a matrix ``A,`` calculate the [`LDR`](@ref) factorization ``(A^{-1})^{\dagger},``
-# storing the result in `A⁻ᵀ`.
-
-# # Algorithm
-
-# By calculating the pivoted QR factorization of `A`, we can calculate the [`LDR`](@ref)
-# facorization `(A^{-1})^{\dagger} = L_0 D_0 R_0` using the procedure
-
-# ```math
-# \begin{align*}
-# (A^{-1})^{\dagger}:= & ([QRP^{T}]^{-1})^{\dagger}\\
-# = & ([Q\,\textrm{|diag}(R)|\,|\textrm{diag}(R)|^{-1}\,RP^{T}]^{-1})^{\dagger}\\
-# = & [\overset{R_{0}^{\dagger}}{\overbrace{PR^{-1}|\textrm{diag}(R)}|}\,\overset{D_{0}}{\overbrace{|\textrm{diag}(R)|^{-1}}}\,\overset{L_{0}^{\dagger}}{\overbrace{Q^{\dagger}}}]^{\dagger}\\
-# = & [R_{0}^{\dagger}D_{0}L_{0}^{\dagger}]^{\dagger}\\
-# = & L_{0}D_{0}R_{0}.
-# \end{align*}
-# ```
-# """
-# function adjoint_inv_ldr!(A⁻ᵀ::LDR{T}, A::AbstractMatrix{T}, ws::LDRWorkspace{T}) where {T}
-
-#     # calculate A = Q⋅R⋅Pᵀ
-#     copyto!(A⁻ᵀ.L, A)
-#     LAPACK.geqp3!(A⁻ᵀ.L, ws.qr_ws)
-#     copyto!(A⁻ᵀ.R, A⁻ᵀ.L)
-#     triu!(A⁻ᵀ.R) # R (set lower triangular to 0)
-#     pᵀ = ws.qr_ws.jpvt
-#     p  = ws.lu_ws.ipiv
-#     inv_P!(p, pᵀ) # P
-#     LAPACK.orgqr!(Aᵀ.L, ws.qr_ws) # L₀ = Q
-#     @fastmath @inbounds for i in eachindex(A⁻ᵀ.d)
-#         A⁻ᵀ.d[i] = inv(abs(A⁻ᵀ.R[i,i])) # D₀ = |diag(R)|⁻¹
-#     end
-#     R′ = A⁻ᵀ.R
-#     lmul_D!(A⁻ᵀ.d, R′) # R′ := |diag(R)|⁻¹⋅R
-#     R″ = R′
-#     LinearAlgebra.inv!(UpperTriangular(R″)) # R″ = (R′)⁻¹ = R⁻¹⋅|diag(R)|
-#     R₀ᵀ = ws.M
-#     mul_P!(R₀ᵀ, p, R″) # R₀ᵀ = P⋅R″ = P⋅R⁻¹⋅diag(R)
-#     adjoint(A⁻ᵀ.R, R₀ᵀ) # R₀ = [P⋅R⁻¹⋅diag(R)]ᵀ
-
-#     return nothing
-# end
-
-
 @doc raw"""
     inv_IpA!(G::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E})::Tuple{E,T} where {T,E}
 
@@ -85,18 +38,20 @@ function inv_IpA!(G::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E})::Tup
     @. d₋ = min(dₐ, 1)
 
     # calculate Lₐ⋅D₋
-    mul_D!(ws.M, Lₐ, d₋)
+    D₋ = Diagonal(d₋)
+    mul!(ws.M, Lₐ, D₋)
 
     # calculate D₊ = max(Dₐ, 1)
     d₊ = ws.v
     @. d₊ = max(dₐ, 1)
 
     # calculate sign(det(D₊)) and log(|det(D₊)|)
-    logdetD₊, sgndetD₊ = det_D(d₊)
+    D₊ = Diagonal(d₊)
+    logdetD₊, sgndetD₊ = logabsdet(D₊)
 
     # calculate Rₐ⁻¹⋅D₊⁻¹
     Rₐ⁻¹D₊ = Rₐ⁻¹
-    rdiv_D!(Rₐ⁻¹D₊, d₊)
+    rdiv!(Rₐ⁻¹D₊, D₊)
 
     # calculate M = Rₐ⁻¹⋅D₊⁻¹ + Lₐ⋅D₋
     axpy!(1.0, Rₐ⁻¹D₊, ws.M)
@@ -160,40 +115,44 @@ function inv_IpUV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorksp
     # calcuate Dᵥ₊ = max(Dᵥ, 1)
     dᵥ₊ = ws.v
     @. dᵥ₊ = max(dᵥ, 1)
+    Dᵥ₊ = Diagonal(dᵥ₊)
 
     # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
-    logdetDᵥ₊, sgndetDᵥ₊ = det_D(dᵥ₊)
+    logdetDᵥ₊, sgndetDᵥ₊ = logabsdet(Dᵥ₊)
 
     # calculate Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    rdiv_D!(Rᵥ⁻¹, dᵥ₊)
+    rdiv!(Rᵥ⁻¹, Dᵥ₊)
     Rᵥ⁻¹Dᵥ₊⁻¹ = Rᵥ⁻¹
 
     # calcuate Dᵤ₊ = max(Dᵤ, 1)
     dᵤ₊ = ws.v
     @. dᵤ₊ = max(dᵤ, 1)
+    Dᵤ₊ = Diagonal(dᵤ₊)
 
     # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
-    logdetDᵤ₊, sgndetDᵤ₊ = det_D(dᵤ₊)
+    logdetDᵤ₊, sgndetDᵤ₊ = logabsdet(Dᵤ₊)
     
     # calcualte Dᵤ₊⁻¹⋅Lᵤᵀ
     adjoint!(ws.M, Lᵤ)
-    ldiv_D!(dᵤ₊, ws.M)
+    ldiv!(Dᵤ₊, ws.M)
     Dᵤ₊⁻¹Lᵤᵀ = ws.M
 
     # calculate Dᵤ₋ = min(Dᵤ, 1)
     dᵤ₋ = ws.v
     @. dᵤ₋ = min(dᵤ, 1)
+    Dᵤ₋ = Diagonal(dᵤ₋)
 
     # calculate Dᵤ₋⋅Rᵤ⋅Lᵥ
     mul!(G, Rᵤ, Lᵥ) # Rᵤ⋅Lᵥ
-    lmul_D!(dᵤ₋, G) # Dᵤ₋⋅Rᵤ⋅Lᵥ
+    lmul!(Dᵤ₋, G) # Dᵤ₋⋅Rᵤ⋅Lᵥ
 
     # calculate Dᵥ₋ = min(Dᵥ, 1)
     dᵥ₋ = ws.v
     @. dᵥ₋ = min(dᵥ, 1)
+    Dᵥ₋ = Diagonal(dᵥ₋)
 
     # caluclate Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
-    rmul_D!(G, dᵥ₋)
+    rmul!(G, Dᵥ₋)
 
     # caluclate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
     mul!(ws.M″, Dᵤ₊⁻¹Lᵤᵀ, Rᵥ⁻¹Dᵥ₊⁻¹)
@@ -270,41 +229,45 @@ function inv_UpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspa
     # calcuate Dᵥ₊ = max(Dᵥ, 1)
     dᵥ₊ = ws.v
     @. dᵥ₊ = max(dᵥ, 1)
+    Dᵥ₊ = Diagonal(dᵥ₊)
 
     # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
-    logdetDᵥ₊, sgndetDᵥ₊ = det_D(dᵥ₊)
+    logdetDᵥ₊, sgndetDᵥ₊ = logabsdet(Dᵥ₊)
 
     # calculate Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    rdiv_D!(Rᵥ⁻¹, dᵥ₊)
+    rdiv!(Rᵥ⁻¹, Dᵥ₊)
     Rᵥ⁻¹Dᵥ₊⁻¹ = Rᵥ⁻¹
 
     # calcuate Dᵤ₊ = max(Dᵤ, 1)
     dᵤ₊ = ws.v
     @. dᵤ₊ = max(dᵤ, 1)
+    Dᵤ₊ = Diagonal(dᵤ₊)
 
-    # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
-    logdetDᵤ₊, sgndetDᵤ₊ = det_D(dᵤ₊)
+    # calculate sign(det(Dᵤ₊)) and log(|det(Dᵤ₊)|)
+    logdetDᵤ₊, sgndetDᵤ₊ = logabsdet(Dᵤ₊)
     
     # calcualte Dᵤ₊⁻¹⋅Lᵤᵀ
     adjoint!(ws.M, Lᵤ)
-    ldiv_D!(dᵤ₊, ws.M)
+    ldiv!(Dᵤ₊, ws.M)
     Dᵤ₊⁻¹Lᵤᵀ = ws.M
 
     # calculate Dᵤ₋ = min(Dᵤ, 1)
     dᵤ₋ = ws.v
     @. dᵤ₋ = min(dᵤ, 1)
+    Dᵤ₋ = Diagonal(dᵤ₋)
     
     # calculate Dᵤ₋⋅Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
     mul!(G, Rᵤ, Rᵥ⁻¹Dᵥ₊⁻¹) # Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
-    lmul_D!(dᵤ₋, G) # Dᵤ₋⋅[Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊]
+    lmul!(Dᵤ₋, G) # Dᵤ₋⋅[Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊]
 
     # calculate Dᵥ₋ = min(Dᵥ, 1)
     dᵥ₋ = ws.v
     @. dᵥ₋ = min(dᵥ, 1)
+    Dᵥ₋ = Diagonal(dᵥ₋)
 
     # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
     mul!(ws.M″, Dᵤ₊⁻¹Lᵤᵀ, Lᵥ)
-    rmul_D!(ws.M″, dᵥ₋)
+    rmul!(ws.M″, Dᵥ₋)
 
     # calculate M = Dᵤ₋⋅Rᵤ⋅Rᵥ⁻¹⋅Dᵥ₊ + Dᵤ₊⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ₋
     M = G
@@ -374,14 +337,15 @@ function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWork
     # calculate Dᵤ₋ = min(Dᵤ, 1)
     dᵤ₋ = ws.v
     @. dᵤ₋ = min(dᵤ, 1)
+    Dᵤ₋ = Diagonal(dᵤ₋)
 
     # calculate sign(det(Dᵤ₋)) and log(|det(Dᵤ₋)|)
-    logdetDᵤ₋, sgndetDᵤ₋ = det_D(dᵤ₋)
+    logdetDᵤ₋, sgndetDᵤ₋ = logabsdet(Dᵤ₋)
 
     # calculate Dᵤ₋⋅Rᵤ
     Dᵤ₋Rᵤ = ws.M′
     copyto!(Dᵤ₋Rᵤ, Rᵤ)
-    lmul_D!(dᵤ₋, Dᵤ₋Rᵤ)
+    lmul!(Dᵤ₋, Dᵤ₋Rᵤ)
 
     # calculate Rᵥ⁻¹, sign(det(Rᵥ⁻¹)) and log(|det(Rᵥ⁻¹)|)
     Rᵥ⁻¹ = ws.M″
@@ -391,30 +355,33 @@ function inv_invUpV!(G::AbstractMatrix{T}, U::LDR{T,E}, V::LDR{T,E}, ws::LDRWork
     # calculate Dᵥ₊ = max(Dᵥ, 1)
     dᵥ₊ = ws.v
     @. dᵥ₊ = max(dᵥ, 1)
+    Dᵥ₊ = Diagonal(dᵥ₊)
 
     # calculate sign(det(Dᵥ₊)) and log(|det(Dᵥ₊)|)
-    logdetDᵥ₊, sgndetDᵥ₊ = det_D(dᵥ₊)
+    logdetDᵥ₊, sgndetDᵥ₊ = logabsdet(Dᵥ₊)
 
     # calculate Rᵥ⁻¹⋅Dᵥ₊⁻¹
     Rᵥ⁻¹Dᵥ₊⁻¹ = Rᵥ⁻¹
-    rdiv_D!(Rᵥ⁻¹Dᵥ₊⁻¹, dᵥ₊)
+    rdiv!(Rᵥ⁻¹Dᵥ₊⁻¹, Dᵥ₊)
 
     # calculate Dᵥ₋ = min(Dᵥ, 1)
     dᵥ₋ = ws.v
     @. dᵥ₋ = min(dᵥ, 1)
+    Dᵥ₋ = Diagonal(dᵥ₋)
 
     # calculate Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
     mul!(G, Dᵤ₋Rᵤ, Lᵥ) # Dᵤ₋⋅Rᵤ⋅Lᵥ
-    rmul_D!(G, dᵥ₋) # [Dᵤ₋⋅Rᵤ⋅Lᵥ]⋅Dᵥ₋
+    rmul!(G, Dᵥ₋) # [Dᵤ₋⋅Rᵤ⋅Lᵥ]⋅Dᵥ₋
 
     # calculate Dᵤ₊ = max(Dᵤ, 1)
     dᵤ₊ = ws.v
     @. dᵤ₊ = max(dᵤ, 1)
+    Dᵤ₊ = Diagonal(dᵤ₊)
 
     # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹
     Lᵤᵀ = adjoint(Lᵤ)
     mul!(ws.M, Lᵤᵀ, Rᵥ⁻¹Dᵥ₊⁻¹) # Lᵤᵀ⋅[Rᵥ⁻¹⋅Dᵥ₊⁻¹]
-    ldiv_D!(dᵤ₊, ws.M) # Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹]
+    ldiv!(Dᵤ₊, ws.M) # Dᵤ₊⁻¹⋅[Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹]
 
     # calculate Dᵤ₊⁻¹⋅Lᵤᵀ⋅Rᵥ⁻¹⋅Dᵥ₊⁻¹ + Dᵤ₋⋅Rᵤ⋅Lᵥ⋅Dᵥ₋
     axpy!(1.0, ws.M, G)

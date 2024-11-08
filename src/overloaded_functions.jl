@@ -37,7 +37,8 @@ function copyto!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where
     (; M) = ws
 
     copyto!(M, R) # R
-    lmul_D!(d, M) # D⋅R
+    D = Diagonal(d)
+    lmul!(D, M) # D⋅R
     mul!(U, L, M) # U = L⋅D⋅R
 
     return nothing
@@ -77,7 +78,8 @@ function adjoint!(Aᵀ::AbstractMatrix{T}, A::LDR{T,E}, ws::LDRWorkspace{T,E}) w
     Rᵀ = ws.M′
     adjoint!(Rᵀ, R)
     adjoint!(ws.M, L) # Lᵀ
-    lmul_D!(d, ws.M) # D⋅Lᵀ
+    D = Diagonal(d)
+    lmul!(D, ws.M) # D⋅Lᵀ
     mul!(Aᵀ, Rᵀ, ws.M) # Rᵀ⋅D⋅Lᵀ
 
     return nothing
@@ -96,7 +98,8 @@ function lmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {
 
     # calculate V := Lᵤ⋅Dᵤ⋅Rᵤ⋅V
     mul!(ws.M, U.R, V) # Rᵤ⋅V
-    lmul_D!(U.d, ws.M) # Dᵤ⋅Rᵤ⋅V
+    Dᵤ = Diagonal(U.d)
+    lmul!(Dᵤ, ws.M) # Dᵤ⋅Rᵤ⋅V
     mul!(V, U.L, ws.M) # V := Lᵤ⋅Dᵤ⋅Rᵤ⋅V
 
     return nothing
@@ -128,7 +131,8 @@ function lmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {
 
     # calculate product U⋅Lᵥ⋅Dᵥ
     mul!(ws.M, U, V.L) # U⋅Lᵥ
-    mul_D!(V.L, ws.M, V.d) # U⋅Lᵥ⋅Dᵥ
+    Dᵥ = Diagonal(V.d)
+    mul!(V.L, ws.M, Dᵥ) # U⋅Lᵥ⋅Dᵥ
 
     # calcualte [L₀⋅D₀⋅R₀] = U⋅Lᵥ⋅Dᵥ
     ldr!(V, ws)
@@ -169,8 +173,10 @@ function lmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
     mul!(ws.M, U.R, V.L)
 
     # calculate Dᵤ⋅M⋅Dᵥ
-    rmul_D!(ws.M, V.d) # M⋅Dᵥ
-    mul_D!(V.L, U.d, ws.M) # Dᵤ⋅M⋅Dᵥ
+    Dᵥ = Diagonal(V.d)
+    Dᵤ = Diagonal(U.d)
+    rmul!(ws.M, Dᵥ) # M⋅Dᵥ
+    mul!(V.L, Dᵤ, ws.M) # Dᵤ⋅M⋅Dᵥ
 
     # calculate [L₀⋅D₀⋅R₀] = Dᵤ⋅M⋅Dᵥ
     ldr!(V, ws)
@@ -200,7 +206,8 @@ function rmul!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {
 
     # calculate U := U⋅Lᵥ⋅Dᵥ⋅Rᵥ
     mul!(ws.M, U, V.L) # U⋅Lᵥ
-    rmul_D!(ws.M, V.d) # U⋅Lᵥ⋅Dᵥ
+    Dᵥ = Diagonal(V.d)
+    rmul!(ws.M, Dᵥ) # U⋅Lᵥ⋅Dᵥ
     mul!(U, ws.M, V.R) # U := U⋅Lᵥ⋅Dᵥ⋅Rᵥ
 
     return nothing
@@ -232,7 +239,8 @@ function rmul!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {
 
     # calculate Dᵤ⋅Rᵤ⋅V
     mul!(U.L, U.R, V)
-    lmul_D!(U.d, U.L)
+    Dᵤ = Diagonal(U.d)
+    lmul!(Dᵤ, U.L)
 
     # calculate [L₀⋅D₀⋅R₀] = Dᵤ⋅Rᵤ⋅V
     ldr!(U, ws)
@@ -273,8 +281,10 @@ function rmul!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
     mul!(ws.M, U.R, V.L)
 
     # calculate Dᵤ⋅Rᵤ⋅Lᵥ⋅Dᵥ
-    rmul_D!(ws.M, V.d)
-    mul_D!(U.L, U.d, ws.M)
+    Dᵥ = Diagonal(V.d)
+    Dᵤ = Diagonal(U.d)
+    rmul!(ws.M, Dᵥ)
+    mul!(U.L, Dᵤ, ws.M)
 
     # calculate [L₀⋅D₀⋅R₀] = Dᵤ⋅Rᵤ⋅Lᵥ⋅Dᵥ
     ldr!(U, ws)
@@ -381,7 +391,8 @@ function ldiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {
     Lᵤ = ws.M
     copyto!(Lᵤ, U.L)
     ldiv_lu!(Lᵤ, V, ws.lu_ws) # Lᵤ⁻¹⋅V
-    ldiv_D!(U.d, V) # Dᵤ⁻¹⋅Lᵤ⁻¹⋅V
+    Dᵤ = Diagonal(U.d)
+    ldiv!(Dᵤ, V) # Dᵤ⁻¹⋅Lᵤ⁻¹⋅V
     Rᵤ = ws.M
     copyto!(Rᵤ, U.R)
     ldiv_lu!(Rᵤ, V, ws.lu_ws) # V := Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤ⁻¹⋅V
@@ -435,8 +446,10 @@ function ldiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
     copyto!(Rᵥ, V.R)
 
     # calculate Rᵤ⁻¹⋅Dᵤ⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ
-    rmul_D!(V.L, V.d) # [Lᵤᵀ⋅Lᵥ]⋅Dᵥ
-    ldiv_D!(U.d, V.L) # Dᵤ⁻¹⋅[Lᵤᵀ⋅Lᵥ⋅Dᵥ]
+    Dᵥ = Diagonal(V.d)
+    Dᵤ = Diagonal(U.d)
+    rmul!(V.L, Dᵥ) # [Lᵤᵀ⋅Lᵥ]⋅Dᵥ
+    ldiv!(Dᵤ, V.L) # Dᵤ⁻¹⋅[Lᵤᵀ⋅Lᵥ⋅Dᵥ]
     Rᵤ = ws.M
     copyto!(Rᵤ, U.R)
     ldiv_lu!(Rᵤ, V.L, ws.lu_ws) # Rᵤ⁻¹⋅[Dᵤ⁻¹⋅Lᵤᵀ⋅Lᵥ⋅Dᵥ]
@@ -493,7 +506,8 @@ function ldiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {
     copyto!(Rᵥ, V.R)
 
     # calculate U⁻¹⋅Lᵥ⋅Dᵥ
-    rmul_D!(V.L, V.d) # Lᵥ⋅Dᵥ
+    Dᵥ = Diagonal(V.d)
+    rmul!(V.L, Dᵥ) # Lᵥ⋅Dᵥ
     copyto!(ws.M, U)
     ldiv_lu!(ws.M, V.L, ws.lu_ws) # U⁻¹⋅Lᵥ⋅Dᵥ
     
@@ -539,7 +553,8 @@ function rdiv!(U::AbstractMatrix{T}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {
     Lᵥ = ws.M′
     copyto!(Lᵥ, V.L)
     ldiv_lu!(Lᵥ, ws.M, ws.lu_ws) # Lᵥ⁻¹
-    ldiv_D!(V.d, ws.M) # Dᵥ⁻¹⋅Lᵥ⁻¹
+    Dᵥ = Diagonal(V.d)
+    ldiv!(Dᵥ, ws.M) # Dᵥ⁻¹⋅Lᵥ⁻¹
     Rᵥ = ws.M′
     copyto!(Rᵥ, V.R)
     ldiv_lu!(Rᵥ, ws.M, ws.lu_ws) # Rᵥ⁻¹⋅Dᵥ⁻¹⋅Lᵥ⁻¹
@@ -600,8 +615,10 @@ function rdiv!(U::LDR{T,E}, V::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
     copyto!(Lᵤ, U.L)
 
     # calculate Dᵤ⋅M⋅Dᵥ⁻¹
-    div_D!(U.L, ws.M, V.d)
-    lmul_D!(U.d, U.L)
+    Dᵥ = Diagonal(V.d)
+    Dᵤ = Diagonal(U.d)
+    mul!(U.L, Dᵤ, ws.M)
+    rdiv!(U.L, Dᵥ)
 
     # calculate [L₀⋅D₀⋅R₀] = Dᵤ⋅M⋅Dᵥ⁻¹
     ldr!(U, ws)
@@ -660,10 +677,11 @@ function rdiv!(U::LDR{T,E}, V::AbstractMatrix{T}, ws::LDRWorkspace{T,E}) where {
     copyto!(Lᵤ, U.L)
 
     # calculate Dᵤ⋅Rᵤ⋅V⁻¹
+    Dᵤ = Diagonal(U.d)
     copyto!(ws.M, V)
     inv_lu!(ws.M, ws.lu_ws) # V⁻¹
     mul!(U.L, U.R, ws.M) # Rᵤ⋅V⁻¹
-    lmul_D!(U.d, U.L) # Dᵤ⋅Rᵤ⋅V⁻¹
+    lmul!(Dᵤ, U.L) # Dᵤ⋅Rᵤ⋅V⁻¹
 
     # calcualte [L₀⋅D₀⋅R₀] = Dᵤ⋅Rᵤ⋅V⁻¹
     ldr!(U, ws)
@@ -704,7 +722,8 @@ function logabsdet(A::LDR{T,E}, ws::LDRWorkspace{T,E}) where {T,E}
 
     copyto!(ws.M, A.L)
     logdetL, sgndetL = det_lu!(ws.M, ws.lu_ws)
-    logdetD, sgndetD = det_D(A.d)
+    D = Diagonal(A.d)
+    logdetD, sgndetD = logabsdet(D)
     copyto!(ws.M, A.R)
     logdetR, sgndetR = det_lu!(ws.M, ws.lu_ws)
     logdetA = logdetL + logdetD + logdetR

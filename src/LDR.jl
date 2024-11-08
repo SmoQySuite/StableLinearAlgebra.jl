@@ -175,7 +175,8 @@ function ldr!(F::LDR, ws::LDRWorkspace{T}) where{T}
     end
 
     # calculate R = D⁻¹⋅R
-    ldiv_D!(d, M)
+    D = Diagonal(d)
+    ldiv!(D, M)
 
     # calculate R⋅Pᵀ
     mul_P!(R, M, qr_ws.jpvt)
