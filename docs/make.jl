@@ -28,6 +28,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/SmoQySuite/StableLinearAlgebra.jl",
+    repo="github.com/SmoQySuite/StableLinearAlgebra.jl.git",
     devbranch="master",
 )
